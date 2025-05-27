@@ -1,0 +1,11 @@
+# Fichiers d'environnement et de configuration
+.env
+
+# Dépendances Node.js
+node_modules/
+
+# Fichiers de log et temporaires
+*.log
+npm-debug.log*
+.DS_Store # Pour macOS
+Thumbs.db # Pour Windows

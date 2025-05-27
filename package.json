@@ -1,0 +1,29 @@
+{
+  "name": "telegram-getallmylinks-bot",
+  "version": "1.0.0",
+  "description": "Automatisation de tâche via Telegram sur GetAllMyLinks",
+  "main": "index.js",
+  "scripts": {
+    "postinstall": "puppeteer install",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "dotenv": "^16.5.0",
+    "puppeteer": "^24.9.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "telegraf": "^4.16.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Stevenhom/BOT-Telegram---getallmylinks.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Stevenhom/BOT-Telegram---getallmylinks/issues"
+  },
+  "homepage": "https://github.com/Stevenhom/BOT-Telegram---getallmylinks#readme"
+}
