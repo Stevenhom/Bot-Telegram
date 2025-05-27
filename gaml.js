@@ -27,7 +27,8 @@ async function login() {
         '--disable-infobars',
         '--window-size=1280,720',
         '--disable-web-security',
-        '--disable-features=IsolateOrigins,site-per-process'
+        '--disable-features=IsolateOrigins,site-per-process',
+         '--no-zygote'
       ],
       ignoreHTTPSErrors: true,
       defaultViewport: null
