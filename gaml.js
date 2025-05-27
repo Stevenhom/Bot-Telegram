@@ -16,10 +16,9 @@ async function login() {
     let page;
     
     try {
-        // 1. Configuration avancée du navigateur et lancement via browserLauncher (puppeteerExtra)
-        browser = await browserLauncher.launch({ // <-- Utilisez `browserLauncher.launch` ici
+        browser = await browserLauncher.launch({ 
             args: [
-                ...chromium.args, // Arguments nécessaires pour @sparticuz/chromium
+                ...chromium.args,
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-infobars',
@@ -27,20 +26,20 @@ async function login() {
                 '--disable-web-security',
                 '--disable-features=IsolateOrigins,site-per-process',
                 '--no-zygote',
-                '--hide-scrollbars' // Ajouté pour être sûr
+                '--hide-scrollbars'
             ],
-            executablePath: await chromium.executablePath(), // <-- Très important : le chemin de l'exécutable de Chromium
-            headless: chromium.headless, // Utilise la valeur headless de @sparticuz/chromium
+            executablePath: await chromium.executablePath(),
+            headless: chromium.headless, 
             ignoreHTTPSErrors: true,
             userDataDir: './puppeteer_user_data',
             defaultViewport: null
         });
         
-        // 2. Création d'un nouvel onglet contrôlé
         page = await browser.newPage();
 
         // Ajout d'un clic sur le corps pour simuler une interaction initiale
-        await page.click('body').catch(e => console.log("Impossible de cliquer sur le corps (ignorable):", e.message)); 
+        // await page.click('body').catch(e => console.log("Impossible de cliquer sur le corps (ignorable):", e.message)); 
+        // Suppression du clic sur le corps qui peut parfois créer des problèmes si le DOM n'est pas prêt.
         await humanDelay(500);
 
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
@@ -49,13 +48,22 @@ async function login() {
         
         // 5. Navigation initiale avec gestion des erreurs
         try {
-            await page.goto('https://getallmylinks.com', {
-                waitUntil: 'domcontentloaded',
-                timeout: 30000
-            });
+            // Utiliser Promise.all pour attendre la navigation ET le chargement du DOM
+            await Promise.all([
+                page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }), // Attendre une navigation complète
+                page.goto('https://getallmylinks.com', {
+                    waitUntil: 'domcontentloaded',
+                    timeout: 30000
+                })
+            ]);
             await humanDelay(2000 + Math.random() * 2000);
         } catch (e) {
-            console.log('Navigation initiale retardée, continuation...');
+            console.log('Navigation initiale retardée/échouée (ignorable pour l\'instant), continuation:', e.message);
+            // Si la navigation échoue ici, la page pourrait être vide ou en mauvais état.
+            // On peut tenter de recharger si c'est critique
+            if (browser && !browser.isClosed()) { // Utilisation de isClosed pour s'assurer que le navigateur est là
+                 await page.goto('https://getallmylinks.com', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+            }
         }
 
         // --- Gérer les pop-ups/bannières de cookies ici ---
@@ -68,8 +76,8 @@ async function login() {
             'button[text*="J\'accepte"]',
             '#cookie-notice button',
             '.modal-dialog-footer button[type="button"]',
-            'button.accept-button', // Un sélecteur générique supplémentaire
-            'button[aria-label*="accept"]' // Un autre sélecteur générique
+            'button.accept-button', 
+            'button[aria-label*="accept"]' 
         ];
 
         for (const selector of commonConsentSelectors) {
@@ -77,7 +85,10 @@ async function login() {
                 const button = await page.waitForSelector(selector, { timeout: 3000, visible: true });
                 if (button) {
                     console.log(`🍪 Tentative de cliquer sur le bouton de consentement: ${selector}`);
-                    await button.click();
+                    await Promise.all([
+                        page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 5000 }).catch(() => {}), // Attendre une navigation après le clic (si elle a lieu)
+                        button.click()
+                    ]);
                     await humanDelay(1000 + Math.random() * 500); 
                     break; 
                 }
@@ -87,11 +98,22 @@ async function login() {
         }
         // --- FIN de la gestion des pop-ups ---
 
-        await page.evaluate(() => window.scrollBy(0, window.innerHeight * (0.1 + Math.random() * 0.4))); 
-        await humanDelay(500 + Math.random() * 500);
-        await page.evaluate(() => window.scrollBy(0, -window.innerHeight * (0.1 + Math.random() * 0.4))); 
-        await humanDelay(500 + Math.random() * 500);
-        
+        // AJOUT : Vérifier si la page est toujours valide avant de scroller ou d'interagir
+        // Si page.isClosed() existe, vérifiez-le. Sinon, tentez simplement le scroll.
+        // Puppeteer v24.9.0 a page.isClosed() mais pas browser.isClosed() qui est browser.isConnected().
+        if (page.isClosed && page.isClosed()) {
+            console.log("Page fermée, ne peut pas scroller. Recharger?");
+            // Optionnel : Recharger la page ou recréer l'onglet si nécessaire
+            // page = await browser.newPage();
+            // await page.goto(page.url() || 'https://getallmylinks.com', { waitUntil: 'domcontentloaded' });
+        } else {
+             // Ligne 90 : await page.evaluate(...)
+            await page.evaluate(() => window.scrollBy(0, window.innerHeight * (0.1 + Math.random() * 0.4))); 
+            await humanDelay(500 + Math.random() * 500);
+            await page.evaluate(() => window.scrollBy(0, -window.innerHeight * (0.1 + Math.random() * 0.4))); 
+            await humanDelay(500 + Math.random() * 500);
+        }
+       
         // 6. Accès à la page de login avec vérification
         const loginUrl = 'https://getallmylinks.com/login';
         let loginSuccess = false;
@@ -100,20 +122,20 @@ async function login() {
             try {
                 console.log(`🔒 Tentative de connexion #${attempt}`);
                 
-                await page.goto(loginUrl, {
-                    waitUntil: 'domcontentloaded',
-                    timeout: 20000
-                });
+                await Promise.all([
+                    page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 20000 }), // Attendre la navigation après le goto
+                    page.goto(loginUrl, {
+                        waitUntil: 'domcontentloaded',
+                        timeout: 20000
+                    })
+                ]);
                 
                 // 7. Remplissage sécurisé du formulaire
-                // MODIFICATION CLÉ : Augmenter le timeout pour le sélecteur d'email !
-                await page.waitForSelector('input[name="email"]', { timeout: 15000, visible: true }); // Augmenté à 15 secondes et visible
+                await page.waitForSelector('input[name="email"]', { timeout: 15000, visible: true }); 
 
-                // Effacer avant de taper (au cas où)
                 await page.click('input[name="email"]', { clickCount: 3 });
                 await page.keyboard.press('Backspace');
                 
-                // Saisie humaine
                 await humanDelay(500);
                 await page.type('input[name="email"]', process.env.GAML_EMAIL, {
                     delay: 30 + Math.random() * 70
@@ -129,10 +151,7 @@ async function login() {
                 await humanDelay(500);
                 await Promise.all([
                     page.click('button[type="submit"]'),
-                    page.waitForResponse(response => 
-                        response.url().includes('login') && response.status() === 200,
-                        { timeout: 10000 }
-                    )
+                    page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }) // Attendre la navigation après le submit
                 ]);
                 
                 // 9. Vérification finale
@@ -144,7 +163,7 @@ async function login() {
             } catch (error) {
                 console.log(`⚠️ Tentative ${attempt} échouée:`, error.message);
                 // Si le navigateur est toujours ouvert, tenter de recharger la page pour une nouvelle tentative
-                if (browser && !browser.isClosed()) {
+                if (browser && browser.isConnected()) { // CORRECTION : utiliser browser.isConnected()
                     await page.reload({ waitUntil: 'domcontentloaded' }).catch(e => console.log("Erreur lors du rechargement de la page:", e.message));
                 }
                 await humanDelay(3000);
@@ -160,10 +179,11 @@ async function login() {
         
     } catch (error) {
         console.error('❌ Erreur critique:', error);
-        if (browser && !browser.isClosed()) await browser.close(); // Ferme le navigateur si ouvert
+        if (browser && browser.isConnected()) await browser.close(); // CORRECTION : utiliser browser.isConnected()
         throw new Error(`Échec final: ${error.message}`);
     }
 }
+
 
 // Version modifiée de createLink qui utilise le browser et page de login
 async function createLink(slug, url, description) {
