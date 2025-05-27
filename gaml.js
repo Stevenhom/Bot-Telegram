@@ -2,6 +2,8 @@
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const puppeteer = require('puppeteer-core'); // Utilisez puppeteer-core
 const chromium = require('@sparticuz/chromium');
+const puppeteerExtra = require('puppeteer-extra');
+const puppeteerLauncher = puppeteerExtra; 
 //const { executablePath } = require('puppeteer');
 
 // Configuration Stealth
@@ -18,17 +20,15 @@ async function login() {
   let page;
   
     try {
-        browser = await puppeteer.launch({
+        browser = await puppeteerLauncher.launch({ // Utilisez customPuppeteer ici si vous l'avez renommé
             args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'],
-            executablePath: await chromium.executablePath(), // <-- N'oubliez pas les parenthèses ici
-            headless: chromium.headless,
+            executablePath: await chromium.executablePath(),
+            headless: chromium.headless, 
             ignoreHTTPSErrors: true,
             userDataDir: './puppeteer_user_data',
             defaultViewport: null
         });
 
-
-    
     // 2. Création d'un nouvel onglet contrôlé
     page = await browser.newPage();
 
