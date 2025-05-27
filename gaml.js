@@ -1,5 +1,4 @@
 // Importations de base
-const puppeteerCore = require('puppeteer-core');
 const chromium = require('@sparticuz/chromium'); 
 const puppeteerExtra = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
@@ -17,20 +16,31 @@ async function login() {
     let page;
     
     try {
-        // Utilisez 'browserLauncher.launch' ici, qui est configuré avec puppeteerExtra et StealthPlugin
-        browser = await browserLauncher.launch({ 
-            args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'],
-            executablePath: await chromium.executablePath(),
-            headless: chromium.headless, 
+        // 1. Configuration avancée du navigateur et lancement via browserLauncher (puppeteerExtra)
+        browser = await browserLauncher.launch({ // <-- Utilisez `browserLauncher.launch` ici
+            args: [
+                ...chromium.args, // Arguments nécessaires pour @sparticuz/chromium
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-infobars',
+                '--window-size=1280,720',
+                '--disable-web-security',
+                '--disable-features=IsolateOrigins,site-per-process',
+                '--no-zygote',
+                '--hide-scrollbars' // Ajouté pour être sûr
+            ],
+            executablePath: await chromium.executablePath(), // <-- Très important : le chemin de l'exécutable de Chromium
+            headless: chromium.headless, // Utilise la valeur headless de @sparticuz/chromium
             ignoreHTTPSErrors: true,
             userDataDir: './puppeteer_user_data',
             defaultViewport: null
         });
-
+        
         // 2. Création d'un nouvel onglet contrôlé
         page = await browser.newPage();
 
-        await page.click('body'); 
+        // Ajout d'un clic sur le corps pour simuler une interaction initiale
+        await page.click('body').catch(e => console.log("Impossible de cliquer sur le corps (ignorable):", e.message)); 
         await humanDelay(500);
 
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
@@ -47,6 +57,35 @@ async function login() {
         } catch (e) {
             console.log('Navigation initiale retardée, continuation...');
         }
+
+        // --- Gérer les pop-ups/bannières de cookies ici ---
+        const commonConsentSelectors = [
+            'button#onetrust-accept-btn-handler', 
+            '#ez-accept-all', 
+            '.cc-allow', 
+            '[aria-label="Accept cookies"]',
+            'button[text*="Accepter"]',
+            'button[text*="J\'accepte"]',
+            '#cookie-notice button',
+            '.modal-dialog-footer button[type="button"]',
+            'button.accept-button', // Un sélecteur générique supplémentaire
+            'button[aria-label*="accept"]' // Un autre sélecteur générique
+        ];
+
+        for (const selector of commonConsentSelectors) {
+            try {
+                const button = await page.waitForSelector(selector, { timeout: 3000, visible: true });
+                if (button) {
+                    console.log(`🍪 Tentative de cliquer sur le bouton de consentement: ${selector}`);
+                    await button.click();
+                    await humanDelay(1000 + Math.random() * 500); 
+                    break; 
+                }
+            } catch (e) {
+                // Le sélecteur n'a pas été trouvé, on continue
+            }
+        }
+        // --- FIN de la gestion des pop-ups ---
 
         await page.evaluate(() => window.scrollBy(0, window.innerHeight * (0.1 + Math.random() * 0.4))); 
         await humanDelay(500 + Math.random() * 500);
@@ -67,8 +106,9 @@ async function login() {
                 });
                 
                 // 7. Remplissage sécurisé du formulaire
-                await page.waitForSelector('input[name="email"]', { timeout: 500 });
-                
+                // MODIFICATION CLÉ : Augmenter le timeout pour le sélecteur d'email !
+                await page.waitForSelector('input[name="email"]', { timeout: 15000, visible: true }); // Augmenté à 15 secondes et visible
+
                 // Effacer avant de taper (au cas où)
                 await page.click('input[name="email"]', { clickCount: 3 });
                 await page.keyboard.press('Backspace');
@@ -103,6 +143,10 @@ async function login() {
                 }
             } catch (error) {
                 console.log(`⚠️ Tentative ${attempt} échouée:`, error.message);
+                // Si le navigateur est toujours ouvert, tenter de recharger la page pour une nouvelle tentative
+                if (browser && !browser.isClosed()) {
+                    await page.reload({ waitUntil: 'domcontentloaded' }).catch(e => console.log("Erreur lors du rechargement de la page:", e.message));
+                }
                 await humanDelay(3000);
             }
         }
@@ -116,7 +160,7 @@ async function login() {
         
     } catch (error) {
         console.error('❌ Erreur critique:', error);
-        if (browser) await browser.close();
+        if (browser && !browser.isClosed()) await browser.close(); // Ferme le navigateur si ouvert
         throw new Error(`Échec final: ${error.message}`);
     }
 }
