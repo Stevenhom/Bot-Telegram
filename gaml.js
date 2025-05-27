@@ -19,7 +19,7 @@ async function login() {
     // 1. Configuration avancée du navigateur
     browser = await puppeteer.launch({
       headless: true,
-      executablePath: executablePath(),
+      //executablePath: executablePath(),
       userDataDir: './puppeteer_user_data',
       args: [
         '--no-sandbox',
