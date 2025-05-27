@@ -119,6 +119,26 @@ bot.on('text', async (ctx) => {
 });
 
 
+const express = require('express');
+const app = express();
+// Render fournit le port via process.env.PORT
+const port = process.env.PORT || 3000; 
+
+app.get('/', (req, res) => {
+  // Un simple message pour indiquer que le service est vivant
+  res.send('Bot is running and alive!');
+});
+
+app.listen(port, () => {
+  console.log(`Web server listening on port ${port}`);
+});
+
+// Optionnel : un endpoint pour la vérification de l'état du bot si besoin
+app.get('/health', (req, res) => {
+    res.status(200).send('OK');
+});
+
+
 bot.launch();
 console.log('🤖 Bot Sirenza démarré !');
 
