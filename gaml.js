@@ -1,7 +1,7 @@
 //const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const puppeteer = require('puppeteer-core'); // Utilisez puppeteer-core
-const chromium = require('chrome-aws-lambda');
+const chromium = require('@sparticuz/chromium');
 //const { executablePath } = require('puppeteer');
 
 // Configuration Stealth
@@ -17,16 +17,17 @@ async function login() {
   let browser;
   let page;
   
-   try {
+    try {
         browser = await puppeteer.launch({
-            args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'], // Utilisez les arguments de chromium
-            executablePath: await chromium.executablePath, // Ceci est le chemin vers le binaire de chrome-aws-lambda
-            headless: chromium.headless, // Ceci mettra headless à true
+            args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'],
+            executablePath: await chromium.executablePath(), // <-- N'oubliez pas les parenthèses ici
+            headless: chromium.headless,
             ignoreHTTPSErrors: true,
-            userDataDir: './puppeteer_user_data', // Gardez ceci si vous avez besoin de sessions persistantes
-            defaultViewport: null // Pas de viewport par défaut
+            userDataDir: './puppeteer_user_data',
+            defaultViewport: null
         });
-        
+
+
     
     // 2. Création d'un nouvel onglet contrôlé
     page = await browser.newPage();
