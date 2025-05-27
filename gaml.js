@@ -24,109 +24,180 @@
     let page;
     
     try {
-        // Configuration optimisée pour Render
-        browser = await puppeteer.launch({ 
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--single-process',
-                '--no-zygote',
-                '--disable-gpu',
-                '--hide-scrollbars'
-            ],
-            executablePath: await chromium.executablePath(),
-            headless: "new",
-            ignoreHTTPSErrors: true,
-            timeout: 120000
-        });
+        // Configuration optimisée pour Render avec Chromium spécifique
+        browser = await pTimeout(
+            browserLauncher.launch({ 
+                args: [
+                    ...chromium.args,
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--single-process',
+                    '--no-zygote',
+                    '--disable-gpu',
+                    '--hide-scrollbars',
+                    '--disable-web-security'
+                ],
+                executablePath: await chromium.executablePath(),
+                headless: chromium.headless,
+                ignoreHTTPSErrors: true,
+                defaultViewport: chromium.defaultViewport,
+                userDataDir: './puppeteer_user_data'
+            }),
+            120000,
+            'Le lancement du navigateur a timeout après 120s'
+        );
         
-        console.log(`[${(Date.now() - startTime) / 1000}s] Navigateur lancé.`);
+        console.log(`[${(Date.now() - startTime) / 1000}s] Navigateur lancé avec succès.`);
 
         page = await browser.newPage();
         await page.setDefaultNavigationTimeout(120000);
         await page.setDefaultTimeout(60000);
 
-        // Configuration de la page
+        // Configuration avancée de la page avec Stealth
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
-        await page.setViewport({ width: 1280, height: 720 });
+        await page.setViewport({ width: 1280, height: 720, deviceScaleFactor: 1 });
+        await page.setJavaScriptEnabled(true);
         
-        console.log(`[${(Date.now() - startTime) / 1000}s] 🌐 Simulation du comportement humain...`);
+        console.log(`[${(Date.now() - startTime) / 1000}s] 🌐 Simulation du comportement humain avec Stealth...`);
         
         // Navigation initiale avec gestion robuste des erreurs
         try {
-            await page.goto('https://getallmylinks.com', {
-                waitUntil: 'networkidle2',
-                timeout: 120000
-            });
-            console.log(`[${(Date.now() - startTime) / 1000}s] Page getallmylinks.com chargée.`);
-            await humanDelay(2000);
+            await pTimeout(
+                page.goto('https://getallmylinks.com', {
+                    waitUntil: 'networkidle2',
+                    timeout: 120000
+                }),
+                120000,
+                'Timeout navigation initiale'
+            );
+            console.log(`[${(Date.now() - startTime) / 1000}s] Page getallmylinks.com chargée avec succès.`);
+            await humanDelay(2000 + Math.random() * 1000);
         } catch (e) {
-            console.log(`[${(Date.now() - startTime) / 1000}s] Navigation initiale échouée, tentative de récupération...`);
+            console.log(`[${(Date.now() - startTime) / 1000}s] Navigation initiale échouée, tentative de récupération...`, e.message);
             await page.goto('about:blank');
-            await page.goto('https://getallmylinks.com', { waitUntil: 'domcontentloaded', timeout: 60000 });
+            await page.goto('https://getallmylinks.com', { 
+                waitUntil: 'domcontentloaded', 
+                timeout: 60000 
+            });
         }
 
-        // Scroll simulation
+        // Scroll simulation plus humaine
         try {
-            await page.evaluate(() => {
-                window.scrollBy(0, window.innerHeight * 0.3);
-                setTimeout(() => window.scrollBy(0, -window.innerHeight * 0.1), 500);
-            });
-            console.log(`[${(Date.now() - startTime) / 1000}s] Scroll effectué.`);
-            await humanDelay(1000);
+            await pTimeout(
+                page.evaluate(async () => {
+                    const scroll = (amount) => {
+                        return new Promise(resolve => {
+                            const start = window.pageYOffset;
+                            const distance = amount - start;
+                            const duration = 1000 + Math.random() * 500;
+                            let startTime = null;
+
+                            function animate(currentTime) {
+                                if (!startTime) startTime = currentTime;
+                                const timeElapsed = currentTime - startTime;
+                                const progress = Math.min(timeElapsed / duration, 1);
+                                window.scrollTo(0, start + distance * progress);
+                                
+                                if (timeElapsed < duration) {
+                                    window.requestAnimationFrame(animate);
+                                } else {
+                                    resolve();
+                                }
+                            }
+
+                            window.requestAnimationFrame(animate);
+                        });
+                    };
+
+                    await scroll(window.innerHeight * 0.4);
+                    await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
+                    await scroll(window.innerHeight * 0.2);
+                }),
+                5000,
+                'Timeout scroll simulation'
+            );
+            console.log(`[${(Date.now() - startTime) / 1000}s] Scroll réaliste effectué.`);
+            await humanDelay(1000 + Math.random() * 1000);
         } catch (e) {
             console.log(`[${(Date.now() - startTime) / 1000}s] Échec du scroll: ${e.message}`);
         }
 
-        // Processus de connexion
+        // Processus de connexion avec Stealth
         const loginUrl = 'https://getallmylinks.com/login';
         let loginSuccess = false;
         
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
-                console.log(`[${(Date.now() - startTime) / 1000}s] 🔒 Tentative de connexion #${attempt}`);
+                console.log(`[${(Date.now() - startTime) / 1000}s] 🔒 Tentative de connexion #${attempt} avec Stealth...`);
                 
-                await page.goto(loginUrl, {
-                    waitUntil: 'networkidle2',
-                    timeout: 90000
-                });
-                console.log(`[${(Date.now() - startTime) / 1000}s] Page de connexion chargée.`);
+                await pTimeout(
+                    page.goto(loginUrl, {
+                        waitUntil: 'networkidle2',
+                        timeout: 90000
+                    }),
+                    90000,
+                    'Timeout chargement page login'
+                );
+                console.log(`[${(Date.now() - startTime) / 1000}s] Page de connexion chargée avec succès.`);
 
-                // Attente optimisée des champs
-                await page.waitForSelector('input[name="email"]', { 
-                    visible: true,
-                    timeout: 30000
-                });
+                // Attente optimisée des champs avec gestion du shadow DOM si nécessaire
+                await pTimeout(
+                    page.waitForSelector('input[name="email"]', { 
+                        visible: true,
+                        timeout: 30000
+                    }),
+                    30000,
+                    'Timeout attente champs email'
+                );
                 console.log(`[${(Date.now() - startTime) / 1000}s] Champs de formulaire trouvés.`);
 
-                // Saisie des identifiants
-                await page.click('input[name="email"]', { delay: 50 });
+                // Saisie des identifiants de manière humaine
+                await humanDelay(500);
+                await page.click('input[name="email"]', { delay: 20 + Math.random() * 30 });
+                await humanDelay(200);
                 await page.keyboard.down('Control');
                 await page.keyboard.press('A');
                 await page.keyboard.up('Control');
+                await humanDelay(100);
                 await page.keyboard.press('Backspace');
-                await page.type('input[name="email"]', process.env.GAML_EMAIL, { delay: 50 });
+                await humanDelay(300);
                 
-                await page.type('input[name="password"]', process.env.GAML_PASSWORD, { delay: 50 });
-                console.log(`[${(Date.now() - startTime) / 1000}s] Identifiants saisis.`);
+                await page.type('input[name="email"]', process.env.GAML_EMAIL, { 
+                    delay: 30 + Math.random() * 70 
+                });
+                await humanDelay(500 + Math.random() * 500);
                 
-                // Soumission
-                await Promise.all([
-                    page.click('button[type="submit"]'),
-                    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 })
-                ]);
+                await page.type('input[name="password"]', process.env.GAML_PASSWORD, { 
+                    delay: 40 + Math.random() * 60 
+                });
+                console.log(`[${(Date.now() - startTime) / 1000}s] Identifiants saisis de manière réaliste.`);
                 
-                // Vérification de la connexion
-                if (page.url().includes('/account')) {
+                // Soumission avec détection de navigation
+                await humanDelay(1000 + Math.random() * 1000);
+                await pTimeout(
+                    Promise.all([
+                        page.click('button[type="submit"]', { delay: 50 }),
+                        page.waitForNavigation({ 
+                            waitUntil: 'networkidle2', 
+                            timeout: 30000 
+                        })
+                    ]),
+                    40000,
+                    'Timeout soumission formulaire'
+                );
+                
+                // Vérification robuste de la connexion
+                const currentUrl = await page.url();
+                if (currentUrl.includes('/account') || currentUrl.includes('dashboard')) {
                     loginSuccess = true;
-                    console.log(`[${(Date.now() - startTime) / 1000}s] ✅ Connexion réussie!`);
+                    console.log(`[${(Date.now() - startTime) / 1000}s] ✅ Connexion réussie! URL actuelle: ${currentUrl}`);
                     break;
                 }
             } catch (error) {
                 console.log(`[${(Date.now() - startTime) / 1000}s] ⚠️ Tentative ${attempt} échouée:`, error.message);
                 await page.goto('about:blank');
-                await humanDelay(3000);
+                await humanDelay(3000 + Math.random() * 2000);
             }
         }
         
@@ -134,14 +205,25 @@
             throw new Error('Échec après 3 tentatives de connexion');
         }
 
+        // Vérification finale que nous sommes bien connectés
+        try {
+            await page.waitForSelector('a[href*="logout"]', { timeout: 10000 });
+            console.log(`[${(Date.now() - startTime) / 1000}s] 🔍 Element de déconnexion trouvé, confirmation de la connexion.`);
+        } catch (e) {
+            console.log(`[${(Date.now() - startTime) / 1000}s] Avertissement: impossible de trouver le bouton de déconnexion`);
+        }
+
         return { browser, page };
         
     } catch (error) {
-        console.error(`[${(Date.now() - startTime) / 1000}s] ❌ Erreur critique:`, error);
-        if (browser) await browser.close().catch(() => {});
-        throw error;
+        console.error(`[${(Date.now() - startTime) / 1000}s] ❌ Erreur critique dans login:`, error);
+        if (browser && browser.isConnected()) {
+            await browser.close().catch(e => console.log(`Erreur lors de la fermeture du navigateur: ${e.message}`));
+        }
+        throw new Error(`Échec de la connexion: ${error.message}`);
     }
 }
+
 
 // Version modifiée de createLink qui utilise le browser et page de login
 async function createLink(slug, url, description) {
