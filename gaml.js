@@ -28,7 +28,9 @@ async function login() {
         '--window-size=1280,720',
         '--disable-web-security',
         '--disable-features=IsolateOrigins,site-per-process',
-         '--no-zygote'
+        '--no-zygote', // <-- Assurez-vous que ceci est toujours là
+        '--disable-gpu', // <-- AJOUTER CELUI-CI, souvent nécessaire sur les VM
+        '--disable-dev-shm-usage' // <-- AJOUT
       ],
       ignoreHTTPSErrors: true,
       defaultViewport: null
