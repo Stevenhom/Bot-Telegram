@@ -1,5 +1,7 @@
-const puppeteer = require('puppeteer-extra');
+//const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+const puppeteer = require('puppeteer-core'); // Utilisez puppeteer-core
+const chromium = require('chrome-aws-lambda');
 //const { executablePath } = require('puppeteer');
 
 // Configuration Stealth
@@ -15,26 +17,16 @@ async function login() {
   let browser;
   let page;
   
-  try {
-    // 1. Configuration avancée du navigateur
-    browser = await puppeteer.launch({
-      headless: true,
-      //executablePath: executablePath(),
-      userDataDir: './puppeteer_user_data',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-infobars',
-        '--window-size=1280,720',
-        '--disable-web-security',
-        '--disable-features=IsolateOrigins,site-per-process',
-        '--no-zygote', // <-- Assurez-vous que ceci est toujours là
-        '--disable-gpu', // <-- AJOUTER CELUI-CI, souvent nécessaire sur les VM
-        '--disable-dev-shm-usage' // <-- AJOUT
-      ],
-      ignoreHTTPSErrors: true,
-      defaultViewport: null
-    });
+   try {
+        browser = await puppeteer.launch({
+            args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'], // Utilisez les arguments de chromium
+            executablePath: await chromium.executablePath, // Ceci est le chemin vers le binaire de chrome-aws-lambda
+            headless: chromium.headless, // Ceci mettra headless à true
+            ignoreHTTPSErrors: true,
+            userDataDir: './puppeteer_user_data', // Gardez ceci si vous avez besoin de sessions persistantes
+            defaultViewport: null // Pas de viewport par défaut
+        });
+        
     
     // 2. Création d'un nouvel onglet contrôlé
     page = await browser.newPage();
