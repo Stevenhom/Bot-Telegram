@@ -6,19 +6,16 @@ const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteerExtra.use(StealthPlugin());
 const browserLauncher = puppeteerExtra; 
 
-// Configuration Stealth
-puppeteer.use(StealthPlugin());
-
 // Fonction d'attente pour les délais humanisés
 const humanDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Définition de la fonction wait standard (pour compatibilité avec le reste du code)
-const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms)); // Assurez-vous que cette fonction est bien utilisée ailleurs ou supprimez-la si inutile
 
 async function login() {
-  let browser;
-  let page;
-  
+    let browser;
+    let page;
+    
     try {
         // Utilisez 'browserLauncher.launch' ici, qui est configuré avec puppeteerExtra et StealthPlugin
         browser = await browserLauncher.launch({ 
@@ -30,110 +27,98 @@ async function login() {
             defaultViewport: null
         });
 
-    // 2. Création d'un nouvel onglet contrôlé
-    page = await browser.newPage();
+        // 2. Création d'un nouvel onglet contrôlé
+        page = await browser.newPage();
 
-    await page.click('body'); // Au début de la fonction, après page.newPage()
-    await humanDelay(500);
-
-     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
-    
-    /*// 3. Configuration des en-têtes
-    await page.setExtraHTTPHeaders({
-      'Accept-Language': 'fr-FR,fr;q=0.9'
-    });
-    
-    // 4. Masquage complet de l'automatisation
-    await page.evaluateOnNewDocument(() => {
-      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-      Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3] });
-      window.chrome = { runtime: {} };
-    });
-    */
-    console.log('🌐 Simulation du comportement humain...');
-    
-    // 5. Navigation initiale avec gestion des erreurs
-    try {
-      await page.goto('https://getallmylinks.com', {
-        waitUntil: 'domcontentloaded',
-        timeout: 30000
-      });
-      await humanDelay(2000 + Math.random() * 2000);
-    } catch (e) {
-      console.log('Navigation initiale retardée, continuation...');
-    }
-
-    await page.evaluate(() => window.scrollBy(0, window.innerHeight * (0.1 + Math.random() * 0.4))); // Scroll aléatoire vers le bas
-    await humanDelay(500 + Math.random() * 500);
-    await page.evaluate(() => window.scrollBy(0, -window.innerHeight * (0.1 + Math.random() * 0.4))); // Scroll aléatoire vers le haut
-    await humanDelay(500 + Math.random() * 500);
-    
-    // 6. Accès à la page de login avec vérification
-    const loginUrl = 'https://getallmylinks.com/login';
-    let loginSuccess = false;
-    
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        console.log(`🔒 Tentative de connexion #${attempt}`);
-        
-        await page.goto(loginUrl, {
-          waitUntil: 'domcontentloaded',
-          timeout: 20000
-        });
-        
-        // 7. Remplissage sécurisé du formulaire
-        await page.waitForSelector('input[name="email"]', { timeout: 500 });
-        
-        // Effacer avant de taper (au cas où)
-        await page.click('input[name="email"]', { clickCount: 3 });
-        await page.keyboard.press('Backspace');
-        
-        // Saisie humaine
+        await page.click('body'); 
         await humanDelay(500);
-        await page.type('input[name="email"]', process.env.GAML_EMAIL, {
-          delay: 30 + Math.random() * 70
-        });
+
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
         
+        console.log('🌐 Simulation du comportement humain...');
+        
+        // 5. Navigation initiale avec gestion des erreurs
+        try {
+            await page.goto('https://getallmylinks.com', {
+                waitUntil: 'domcontentloaded',
+                timeout: 30000
+            });
+            await humanDelay(2000 + Math.random() * 2000);
+        } catch (e) {
+            console.log('Navigation initiale retardée, continuation...');
+        }
+
+        await page.evaluate(() => window.scrollBy(0, window.innerHeight * (0.1 + Math.random() * 0.4))); 
+        await humanDelay(500 + Math.random() * 500);
+        await page.evaluate(() => window.scrollBy(0, -window.innerHeight * (0.1 + Math.random() * 0.4))); 
         await humanDelay(500 + Math.random() * 500);
         
-        await page.type('input[name="password"]', process.env.GAML_PASSWORD, {
-          delay: 30 + Math.random() * 70
-        });
+        // 6. Accès à la page de login avec vérification
+        const loginUrl = 'https://getallmylinks.com/login';
+        let loginSuccess = false;
         
-        // 8. Soumission avec vérification
-        await humanDelay(500);
-        await Promise.all([
-          page.click('button[type="submit"]'),
-          page.waitForResponse(response => 
-            response.url().includes('login') && response.status() === 200,
-            { timeout: 10000 }
-          )
-        ]);
-        
-        // 9. Vérification finale
-        await humanDelay(3000);
-        if (page.url().includes('/account')) {
-          loginSuccess = true;
-          break;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                console.log(`🔒 Tentative de connexion #${attempt}`);
+                
+                await page.goto(loginUrl, {
+                    waitUntil: 'domcontentloaded',
+                    timeout: 20000
+                });
+                
+                // 7. Remplissage sécurisé du formulaire
+                await page.waitForSelector('input[name="email"]', { timeout: 500 });
+                
+                // Effacer avant de taper (au cas où)
+                await page.click('input[name="email"]', { clickCount: 3 });
+                await page.keyboard.press('Backspace');
+                
+                // Saisie humaine
+                await humanDelay(500);
+                await page.type('input[name="email"]', process.env.GAML_EMAIL, {
+                    delay: 30 + Math.random() * 70
+                });
+                
+                await humanDelay(500 + Math.random() * 500);
+                
+                await page.type('input[name="password"]', process.env.GAML_PASSWORD, {
+                    delay: 30 + Math.random() * 70
+                });
+                
+                // 8. Soumission avec vérification
+                await humanDelay(500);
+                await Promise.all([
+                    page.click('button[type="submit"]'),
+                    page.waitForResponse(response => 
+                        response.url().includes('login') && response.status() === 200,
+                        { timeout: 10000 }
+                    )
+                ]);
+                
+                // 9. Vérification finale
+                await humanDelay(3000);
+                if (page.url().includes('/account')) {
+                    loginSuccess = true;
+                    break;
+                }
+            } catch (error) {
+                console.log(`⚠️ Tentative ${attempt} échouée:`, error.message);
+                await humanDelay(3000);
+            }
         }
-      } catch (error) {
-        console.log(`⚠️ Tentative ${attempt} échouée:`, error.message);
-        await humanDelay(3000);
-      }
+        
+        if (!loginSuccess) {
+            throw new Error('Échec après 3 tentatives');
+        }
+        
+        console.log('✅ Connexion réussie!');
+        return { browser, page };
+        
+    } catch (error) {
+        console.error('❌ Erreur critique:', error);
+        if (browser) await browser.close();
+        throw new Error(`Échec final: ${error.message}`);
     }
-    
-    if (!loginSuccess) {
-      throw new Error('Échec après 3 tentatives');
-    }
-    
-    console.log('✅ Connexion réussie!');
-    return { browser, page };
-   
-  } catch (error) {
-    console.error('❌ Erreur critique:', error);
-    if (browser) await browser.close();
-    throw new Error(`Échec final: ${error.message}`);
-  }
 }
 
 // Version modifiée de createLink qui utilise le browser et page de login
