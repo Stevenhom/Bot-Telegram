@@ -20,6 +20,7 @@ async function login() {
     browser = await puppeteer.launch({
       headless: true,
       executablePath: executablePath(),
+      userDataDir: './puppeteer_user_data',
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -34,6 +35,11 @@ async function login() {
     
     // 2. Création d'un nouvel onglet contrôlé
     page = await browser.newPage();
+
+    await page.click('body'); // Au début de la fonction, après page.newPage()
+    await humanDelay(500);
+
+     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
     
     /*// 3. Configuration des en-têtes
     await page.setExtraHTTPHeaders({
@@ -59,6 +65,11 @@ async function login() {
     } catch (e) {
       console.log('Navigation initiale retardée, continuation...');
     }
+
+    await page.evaluate(() => window.scrollBy(0, window.innerHeight * (0.1 + Math.random() * 0.4))); // Scroll aléatoire vers le bas
+    await humanDelay(500 + Math.random() * 500);
+    await page.evaluate(() => window.scrollBy(0, -window.innerHeight * (0.1 + Math.random() * 0.4))); // Scroll aléatoire vers le haut
+    await humanDelay(500 + Math.random() * 500);
     
     // 6. Accès à la page de login avec vérification
     const loginUrl = 'https://getallmylinks.com/login';

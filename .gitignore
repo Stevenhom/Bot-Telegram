@@ -4,6 +4,9 @@
 # Dépendances Node.js
 node_modules/
 
+# Dossier de données utilisateur de Puppeteer (contient cookies, cache...)
+puppeteer_user_data/
+
 # Fichiers de log et temporaires
 *.log
 npm-debug.log*
