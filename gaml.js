@@ -1,10 +1,10 @@
-//const puppeteer = require('puppeteer-extra');
-const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-const puppeteer = require('puppeteer-core'); // Utilisez puppeteer-core
-const chromium = require('@sparticuz/chromium');
+// Importations de base
+const puppeteerCore = require('puppeteer-core');
+const chromium = require('@sparticuz/chromium'); 
 const puppeteerExtra = require('puppeteer-extra');
-const puppeteerLauncher = puppeteerExtra; 
-//const { executablePath } = require('puppeteer');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+puppeteerExtra.use(StealthPlugin());
+const browserLauncher = puppeteerExtra; 
 
 // Configuration Stealth
 puppeteer.use(StealthPlugin());
@@ -20,7 +20,8 @@ async function login() {
   let page;
   
     try {
-        browser = await puppeteerLauncher.launch({ // Utilisez customPuppeteer ici si vous l'avez renommé
+        // Utilisez 'browserLauncher.launch' ici, qui est configuré avec puppeteerExtra et StealthPlugin
+        browser = await browserLauncher.launch({ 
             args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'],
             executablePath: await chromium.executablePath(),
             headless: chromium.headless, 
