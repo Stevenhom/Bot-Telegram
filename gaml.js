@@ -52,7 +52,7 @@
         // 5. Navigation initiale avec gestion des erreurs
         try {
             await Promise.all([
-                page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60000 }), 
+                page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 120000 }), 
                 page.goto('https://getallmylinks.com', {
                     waitUntil: 'domcontentloaded',
                     timeout: 60000 
@@ -68,37 +68,7 @@
             }
         }
 
-        // --- Gérer les pop-ups/bannières de cookies ici ---
-        const commonConsentSelectors = [
-            'button#onetrust-accept-btn-handler', 
-            '#ez-accept-all', 
-            '.cc-allow', 
-            '[aria-label="Accept cookies"]',
-            'button[text*="Accepter"]',
-            'button[text*="J\'accepte"]',
-            '#cookie-notice button',
-            '.modal-dialog-footer button[type="button"]',
-            'button.accept-button', 
-            'button[aria-label*="accept"]' 
-        ];
-
-        for (const selector of commonConsentSelectors) {
-            try {
-                const button = await page.waitForSelector(selector, { timeout: 10000, visible: true }); 
-                if (button) {
-                    console.log(`[${(Date.now() - startTime) / 1000}s] 🍪 Tentative de cliquer sur le bouton de consentement: ${selector}`);
-                    await Promise.all([
-                        page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {}), 
-                        button.click()
-                    ]);
-                    await humanDelay(1000 + Math.random() * 500); 
-                    break; 
-                }
-            } catch (e) {
-                // Le sélecteur n'a pas été trouvé, on continue
-            }
-        }
-       
+      
         if (page.isClosed && page.isClosed()) {
             console.log(`[${(Date.now() - startTime) / 1000}s] Page fermée, ne peut pas scroller. Recharger?`);
         } else {
