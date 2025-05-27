@@ -139,7 +139,12 @@ app.get('/health', (req, res) => {
 });
 
 
-bot.launch();
+bot.launch({
+  polling: {
+    timeout: 300, // 5 minutes en secondes
+    limit: 100 
+  }
+});
 console.log('🤖 Bot Sirenza démarré !');
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
