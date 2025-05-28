@@ -37,9 +37,10 @@
             ],
             // Assure-toi que ce chemin est correct pour ton environnement !
             //executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-            headless: true, // Passe à false pour débugger visuellement !
+            executablePath: chromium.executablePath,
+            headless: chromium.headless, // Passe à false pour débugger visuellement !
             ignoreHTTPSErrors: true,
-            userDataDir: './puppeteer_user_data',
+            //userDataDir: './puppeteer_user_data',
             defaultViewport: null
         });
 
