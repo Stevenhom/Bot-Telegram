@@ -1,5 +1,5 @@
 // Importations de base
-  const chromium = require('@sparticuz/chromium'); 
+  
   const puppeteerExtra = require('puppeteer-extra');
   const StealthPlugin = require('puppeteer-extra-plugin-stealth');
   puppeteerExtra.use(StealthPlugin());
@@ -20,14 +20,14 @@
     let page;
 
     try {
-        browser = await browserLauncher.launch({
+        browser = await puppeteerExtra.launch({
             args: [
+                // Garde ces arguments essentiels pour un environnement headless Linux
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage', 
-                '--disable-gpu',           
-                // '--single-process',    
-                ...chromium.args, 
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                // Retire ...chromium.args car tu n'utilises plus @sparticuz/chromium
                 '--disable-infobars',
                 '--window-size=1280,720',
                 '--disable-web-security',
@@ -35,12 +35,12 @@
                 '--no-zygote',
                 '--hide-scrollbars'
             ],
-            // Assure-toi que ce chemin est correct pour ton environnement !
-            //executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-            executablePath: await chromium.executablePath,
-            headless: chromium.headless, // Passe à false pour débugger visuellement !
+            // executablePath ne sera plus nécessaire ici car PUPPETEER_EXECUTABLE_PATH est défini dans le Dockerfile
+            // ou alors tu peux le fixer à "/usr/bin/google-chrome-stable" si tu préfères la clarté explicite
+            // executablePath: "/usr/bin/google-chrome-stable",
+            headless: true, // Reviens à `true` car c'est une constante maintenant
             ignoreHTTPSErrors: true,
-            //userDataDir: './puppeteer_user_data',
+            // userDataDir: './puppeteer_user_data', // Garde si tu veux, mais la persistance est limitée sur Render
             defaultViewport: null
         });
 
