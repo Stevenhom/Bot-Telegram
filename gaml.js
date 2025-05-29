@@ -11,6 +11,10 @@ const pTimeout = require('p-timeout');
   // Définition de la fonction wait standard (pour compatibilité avec le reste du code)
   const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms)); // Assurez-vous que cette fonction est bien utilisée ailleurs ou supprimez-la si inutile
 
+// Configuration des constantes en haut du fichier
+const CHROME_EXECUTABLE_PATH = process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome';
+const IS_RENDER = process.env.RENDER === 'true'; // Ajoutez RENDER=true dans vos variables d'environnement Render
+
   async function login() {
     const startTime = Date.now();
     console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Début de la connexion dans la fonction login...`);
@@ -20,21 +24,27 @@ const pTimeout = require('p-timeout');
 
     try {
         const launchOptions = {
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--single-process',
-            '--disable-infobars',
-            '--window-size=1280,720',
-            '--disable-web-security'
-          ],
-          executablePath: isRender ? chromeExecutablePath : undefined,
-          headless: isRender ? true : 'new',
-          ignoreHTTPSErrors: true,
-          defaultViewport: null
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--single-process',
+                '--disable-infobars',
+                '--window-size=1280,720',
+                '--disable-web-security'
+            ],
+            executablePath: CHROME_EXECUTABLE_PATH, // Toujours utiliser le chemin configuré
+            headless: 'new', // Utiliser le nouveau mode headless
+            ignoreHTTPSErrors: true,
+            defaultViewport: null
         };
+
+        console.log('Configuration Puppeteer:', {
+            executablePath: launchOptions.executablePath,
+            isRender: IS_RENDER,
+            nodeEnv: process.env.NODE_ENV
+        });
 
 
         console.log(`Options de lancement: ${JSON.stringify(launchOptions, null, 2)}`);
@@ -43,7 +53,7 @@ const pTimeout = require('p-timeout');
 
         page = await browser.newPage();
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
-        
+
         const loginUrl = 'https://getallmylinks.com/login';
         let loginSuccess = false;
 
