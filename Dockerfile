@@ -45,6 +45,8 @@ RUN npm install puppeteer --omit=dev && npx puppeteer browsers install chrome
 
 RUN npx puppeteer browsers list
 
+RUN which chromium && ls -lh /usr/bin/chromium
+
 # Crée le répertoire de travail
 WORKDIR /app
 
