@@ -1,7 +1,14 @@
 FROM node:22-slim
 
-# Installer les dépendances nécessaires à Chromium
+# Empêcher Puppeteer de télécharger Chromium
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
+
+# Installer Google Chrome stable et les dépendances nécessaires
 RUN apt-get update && apt-get install -y \
+    wget \
+    gnupg \
     ca-certificates \
     fonts-liberation \
     libasound2 \
@@ -18,7 +25,7 @@ RUN apt-get update && apt-get install -y \
     libgtk-3-0 \
     libnspr4 \
     libnss3 \
-    libpango-1.0-0 \    
+    libpango-1.0-0 \
     libpangocairo-1.0-0 \
     libx11-6 \
     libxcomposite1 \
@@ -33,22 +40,26 @@ RUN apt-get update && apt-get install -y \
     libu2f-udev \
     libvulkan1 \
     --no-install-recommends && \
+    wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - && \
+    echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list && \
+    apt-get update && \
+    apt-get install -y google-chrome-stable --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
-# Créer et définir le répertoire de travail
+# Définir le répertoire de travail
 WORKDIR /app
 
-# Copier uniquement package.json et package-lock.json pour profiter du cache
+# Copier les fichiers de dépendances
 COPY package*.json ./
 
-# Installer les dépendances Node.js (dont puppeteer)
+# Installer les dépendances
 RUN npm install
 
-# Copier le reste des fichiers de l'application
+# Copier le reste du code source
 COPY . .
 
-# Exposer le port (si ton app en utilise un)
+# Exposer le port utilisé par l'application
 EXPOSE 10000
 
-# Définir la commande de démarrage
+# Démarrer l'application
 CMD ["node", "bot.js"]

@@ -30,6 +30,7 @@ async function login() {
         console.log("🔍 Vérification du cache Puppeteer:", process.env.PUPPETEER_CACHE_DIR || "Non défini");
 
         const launchOptions = {
+            executablePath: '/usr/bin/google-chrome-stable',
             args: [
               '--no-sandbox',
               '--disable-setuid-sandbox',
