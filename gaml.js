@@ -16,10 +16,12 @@ const IS_RENDER = process.env.RENDER === 'true';
 async function login() {
     const startTime = Date.now();
     console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Début de la connexion dans la fonction login...`);
+
     let browser;
     let page;
+
     try {
-        console.log(`Puppeteer va démarrer avec ${launchOptions.executablePath}`);
+        // Définition des options Puppeteer AVANT tout usage !
         const launchOptions = {
             executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
             args: [
@@ -35,16 +37,15 @@ async function login() {
                 '--disable-backgrounding-occluded-windows',
                 '--disable-renderer-backgrounding'
             ],
-            headless: true, // Utilisez 'true' pour exécuter en mode headless
+            headless: true,
             ignoreHTTPSErrors: true,
             defaultViewport: null
-            // PAS d'executablePath - laisse Puppeteer gérer
         };
 
-             console.log('Configuration Puppeteer:', {
+        console.log('Configuration Puppeteer:', {
             isRender: IS_RENDER,
             nodeEnv: process.env.NODE_ENV,
-            chromeSource: 'Puppeteer intégré'
+            chromeSource: process.env.PUPPETEER_EXECUTABLE_PATH || 'Puppeteer intégré'
         });
 
 
