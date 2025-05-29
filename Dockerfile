@@ -38,7 +38,7 @@ RUN apt-get update && apt-get install -y \
     libvulkan1 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN which google-chrome || echo "Chrome non installé"
+RUN apt-get install -y chromium
 
 # Crée le répertoire de travail
 WORKDIR /app
