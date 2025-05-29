@@ -1,8 +1,7 @@
 // Importations de base
-const puppeteerExtra = require('puppeteer-extra');
+const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-puppeteerExtra.use(StealthPlugin());
-const puppeteer = require('puppeteer');
+puppeteer.use(StealthPlugin());
 
 process.env.PUPPETEER_CACHE_DIR = '/opt/render/.cache/puppeteer';
 
@@ -29,13 +28,11 @@ async function login() {
         console.log("🔍 Vérification du cache Puppeteer:", process.env.PUPPETEER_CACHE_DIR || "Non défini");
 
         const launchOptions = {
-            executablePath: '/usr/bin/google-chrome-stable',
             args: [
               '--no-sandbox',
               '--disable-setuid-sandbox',
               '--disable-dev-shm-usage',
               '--disable-gpu',
-              //'--single-process',
               '--disable-infobars',
               '--window-size=1280,720',
               '--disable-web-security',
@@ -47,8 +44,12 @@ async function login() {
             ignoreHTTPSErrors: true,
         };
 
+        if (IS_RENDER) {
+            launchOptions.executablePath = puppeteer.executablePath();
+        }
+
         console.log(`Options de lancement: ${JSON.stringify(launchOptions, null, 2)}`);
-        browser = await puppeteerExtra.launch(launchOptions);
+        browser = await puppeteer.launch(launchOptions);
         console.log('Version Chrome:', await (await browser.version()).toString());
 
 

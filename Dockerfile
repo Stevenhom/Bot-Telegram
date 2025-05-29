@@ -1,12 +1,9 @@
 FROM node:22-slim
 
-# Empêcher Puppeteer de télécharger Chromium
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 
-# Installer Google Chrome stable et les dépendances nécessaires
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     gnupg \
     ca-certificates \
@@ -44,22 +41,15 @@ RUN apt-get update && apt-get install -y \
     echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list && \
     apt-get update && \
     apt-get install -y google-chrome-stable --no-install-recommends && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Définir le répertoire de travail
 WORKDIR /app
 
-# Copier les fichiers de dépendances
 COPY package*.json ./
-
-# Installer les dépendances
 RUN npm install
 
-# Copier le reste du code source
 COPY . .
 
-# Exposer le port utilisé par l'application
 EXPOSE 10000
 
-# Démarrer l'application
-CMD ["node", "bot.js"]
+CMD ["node", "galm.js"]
