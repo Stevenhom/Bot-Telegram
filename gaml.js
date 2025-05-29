@@ -1,10 +1,9 @@
 // Importations de base
   
-  const puppeteerExtra = require('puppeteer-extra');
-  const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-  puppeteerExtra.use(StealthPlugin());
-  const browserLauncher = puppeteerExtra; 
-  const pTimeout = require('p-timeout');
+const puppeteerExtra = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+puppeteerExtra.use(StealthPlugin());
+const pTimeout = require('p-timeout');
 
   // Fonction d'attente pour les délais humanisés
   const humanDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -20,34 +19,31 @@
     let page;
 
     try {
-        browser = await puppeteerExtra.launch({
-            args: [
-                // Garde ces arguments essentiels pour un environnement headless Linux
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                // Retire ...chromium.args car tu n'utilises plus @sparticuz/chromium
-                '--disable-infobars',
-                '--window-size=1280,720',
-                '--disable-web-security',
-                '--disable-features=IsolateOrigins,site-per-process',
-                '--no-zygote',
-                '--hide-scrollbars'
-            ],
-            // executablePath ne sera plus nécessaire ici car PUPPETEER_EXECUTABLE_PATH est défini dans le Dockerfile
-            // ou alors tu peux le fixer à "/usr/bin/google-chrome-stable" si tu préfères la clarté explicite
-            // executablePath: "/usr/bin/google-chrome-stable",
-            headless: true, // Reviens à `true` car c'est une constante maintenant
-            ignoreHTTPSErrors: true,
-            // userDataDir: './puppeteer_user_data', // Garde si tu veux, mais la persistance est limitée sur Render
-            defaultViewport: null
-        });
+        const launchOptions = {
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--single-process',
+            '--disable-infobars',
+            '--window-size=1280,720',
+            '--disable-web-security'
+          ],
+          executablePath: isRender ? chromeExecutablePath : undefined,
+          headless: isRender ? true : 'new',
+          ignoreHTTPSErrors: true,
+          defaultViewport: null
+        };
 
-        console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Navigateur lancé.`);
+
+        console.log(`Options de lancement: ${JSON.stringify(launchOptions, null, 2)}`);
+        browser = await puppeteerExtra.launch(launchOptions);
+        console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Navigateur lancé`);
+
         page = await browser.newPage();
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
-
+        
         const loginUrl = 'https://getallmylinks.com/login';
         let loginSuccess = false;
 
