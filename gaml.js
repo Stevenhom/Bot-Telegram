@@ -12,10 +12,9 @@ const pTimeout = require('p-timeout');
   const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms)); // Assurez-vous que cette fonction est bien utilisée ailleurs ou supprimez-la si inutile
 
 // Configuration des constantes en haut du fichier
-const CHROME_EXECUTABLE_PATH = process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome';
-const IS_RENDER = process.env.RENDER === 'true'; // Ajoutez RENDER=true dans vos variables d'environnement Render
+const IS_RENDER = process.env.RENDER === 'true';
 
-  async function login() {
+async function login() {
     const startTime = Date.now();
     console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Début de la connexion dans la fonction login...`);
 
@@ -32,19 +31,23 @@ const IS_RENDER = process.env.RENDER === 'true'; // Ajoutez RENDER=true dans vos
                 '--single-process',
                 '--disable-infobars',
                 '--window-size=1280,720',
-                '--disable-web-security'
+                '--disable-web-security',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-renderer-backgrounding'
             ],
-            executablePath: CHROME_EXECUTABLE_PATH, // Toujours utiliser le chemin configuré
-            headless: 'new', // Utiliser le nouveau mode headless
+            headless: 'new',
             ignoreHTTPSErrors: true,
             defaultViewport: null
+            // PAS d'executablePath - laisse Puppeteer gérer
         };
 
         console.log('Configuration Puppeteer:', {
-            executablePath: launchOptions.executablePath,
             isRender: IS_RENDER,
-            nodeEnv: process.env.NODE_ENV
+            nodeEnv: process.env.NODE_ENV,
+            chromeSource: 'Puppeteer intégré'
         });
+
 
 
         console.log(`Options de lancement: ${JSON.stringify(launchOptions, null, 2)}`);
