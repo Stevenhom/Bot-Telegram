@@ -21,7 +21,6 @@ async function login() {
     const startTime = Date.now();
     console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Début de la connexion dans la fonction login...`);
     console.log('Chemin Chromium Puppeteer:', puppeteer.executablePath());
-    console.log('Version Chrome:', await (await browser.version()).toString());
 
     let browser;
     let page;
@@ -50,7 +49,7 @@ async function login() {
 
         console.log(`Options de lancement: ${JSON.stringify(launchOptions, null, 2)}`);
         browser = await puppeteerExtra.launch(launchOptions);
-        console.log(`✅ Puppeteer utilise ${await browser.version()}`);
+        console.log('Version Chrome:', await (await browser.version()).toString());
 
 
         console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Navigateur lancé`);
