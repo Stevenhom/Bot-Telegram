@@ -46,12 +46,11 @@ async function login() {
             nodeEnv: process.env.NODE_ENV,
             chromeSource: process.env.PUPPETEER_EXECUTABLE_PATH || 'Puppeteer intégré'
         });
-        console.log(`✅ Puppeteer utilise ce navigateur : ${await browser.version()}`);
 
 
         console.log(`Options de lancement: ${JSON.stringify(launchOptions, null, 2)}`);
         browser = await puppeteerExtra.launch(launchOptions);
-        
+        console.log(`✅ Puppeteer utilise ce navigateur : ${await browser.version()}`);
         console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Navigateur lancé`);
 
         page = await browser.newPage();
