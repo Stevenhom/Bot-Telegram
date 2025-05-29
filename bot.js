@@ -122,7 +122,7 @@ bot.on('text', async (ctx) => {
 const express = require('express');
 const app = express();
 // Render fournit le port via process.env.PORT
-const port = process.env.PORT || 10000; 
+const port = process.env.PORT || 3000; 
 
 app.get('/', (req, res) => {
   // Un simple message pour indiquer que le service est vivant

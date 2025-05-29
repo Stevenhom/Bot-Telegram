@@ -1,5 +1,5 @@
 # Utilise une image Node.js de base
-FROM node:20-slim
+FROM node:22-slim
 
 # Installe les dépendances système nécessaires à Google Chrome
 RUN apt-get update && apt-get install -y \
