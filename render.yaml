@@ -2,9 +2,9 @@ services:
   - type: web
     name: telegram-gaml-bot
     plan: free
-    runtime: docker # <--- C'est la ligne CRUCIALE !
-    buildCommand: npm install # Cette commande sera exécutée DANS le contexte Dockerfile
-    startCommand: node bot.js # Cette commande sera exécutée DANS le conteneur Docker
+    runtime: docker # <--- CECI EST FONDAMENTAL.
+    buildCommand: npm install
+    startCommand: node bot.js
     envVars:
       - key: NODE_ENV
         value: "production"
