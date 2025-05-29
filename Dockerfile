@@ -38,8 +38,8 @@ RUN apt-get update && apt-get install -y \
     libvulkan1 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update && apt-get install -y chromium-browser
-RUN which chromium-browser || echo "Chromium n'est pas installé correctement"
+RUN apt-get update && apt-get install -y chromium
+RUN which chromium || echo "Chromium n'est pas installé correctement"
 
 # Crée le répertoire de travail
 WORKDIR /app
