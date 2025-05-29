@@ -1,5 +1,7 @@
+# Étape 1 : Utiliser une image légère de Node.js
 FROM node:22-slim
 
+# Étape 2 : Installer les dépendances système nécessaires à Puppeteer
 RUN apt-get update && apt-get install -y \
     fonts-liberation \
     libasound2 \
@@ -28,16 +30,25 @@ RUN apt-get update && apt-get install -y \
     libxss1 \
     libxtst6 \
     xdg-utils \
+    ca-certificates \
+    wget \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
+# Étape 3 : Définir le répertoire de travail
 WORKDIR /app
 
+# Étape 4 : Copier les fichiers nécessaires pour npm install
 COPY package*.json ./
+
+# Étape 5 : Installer les dépendances Node.js
 RUN npm install
 
+# Étape 6 : Copier le reste de l'application
 COPY . .
 
+# (Optionnel) Exposer un port (au cas où tu utilises express)
 EXPOSE 10000
 
-CMD ["node", "galm.js"]
+# Étape 7 : Lancer le bot
+CMD ["node", "bot.js"]
