@@ -2,6 +2,8 @@
 const puppeteerExtra = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteerExtra.use(StealthPlugin());
+const puppeteer = require('puppeteer');
+
 const pTimeout = require('p-timeout');
 
   // Fonction d'attente pour les délais humanisés
@@ -23,6 +25,7 @@ async function login() {
     try {
         // Définition des options Puppeteer AVANT tout usage !
         const launchOptions = {
+            product: 'chrome',
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -35,21 +38,21 @@ async function login() {
                 '--disable-background-timer-throttling',
                 '--disable-backgrounding-occluded-windows',
                 '--disable-renderer-backgrounding'
+
             ],
             headless: true,
             ignoreHTTPSErrors: true,
-            defaultViewport: null
+            //defaultViewport: null
         };
 
         console.log('Configuration Puppeteer:', {
             isRender: IS_RENDER,
             nodeEnv: process.env.NODE_ENV,
-            chromeSource: process.env.PUPPETEER_EXECUTABLE_PATH || 'Puppeteer intégré'
+            chromeSource: 'Puppeteer intégré'
         });
 
-
         console.log(`Options de lancement: ${JSON.stringify(launchOptions, null, 2)}`);
-        browser = await puppeteerExtra.launch(launchOptions);
+        browser = await puppeteer.launch(launchOptions);
         console.log(`✅ Puppeteer utilise ce navigateur : ${await browser.version()}`);
         console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Navigateur lancé`);
 
