@@ -1,8 +1,9 @@
 require('dotenv').config();
 const { Telegraf } = require('telegraf');
 const { createLink, getLinkStats, getAllLinksStats, validatePeriod } = require('./gaml');
-
+const puppeteer = require('puppeteer');
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
+process.env.PUPPETEER_CACHE_DIR = '/opt/render/.cache/puppeteer';
 
 const requiredVars = ['TELEGRAM_TOKEN', 'GAML_EMAIL', 'GAML_PASSWORD'];
 const validPeriods = [

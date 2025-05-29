@@ -5,8 +5,6 @@ FROM node:22-slim
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     fonts-liberation \
-    chromium \
-    chromium-driver \
     libappindicator3-1 \
     libasound2 \
     libatk-bridge2.0-0 \
@@ -38,10 +36,12 @@ RUN apt-get update && apt-get install -y \
     xdg-utils \
     libu2f-udev \
     libvulkan1 \
+    chromium \
+    chromium-driver \
     && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update && apt-get install -y chromium
-
+# Installer Puppeteer et forcer le téléchargement de Chrome
+RUN npm install puppeteer --omit=dev && npx puppeteer browsers install chrome
 
 # Crée le répertoire de travail
 WORKDIR /app
