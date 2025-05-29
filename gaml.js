@@ -21,6 +21,7 @@ async function login() {
     const startTime = Date.now();
     console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Début de la connexion dans la fonction login...`);
     console.log('Chemin Chromium Puppeteer:', puppeteer.executablePath());
+    console.log('Version Chrome:', await (await browser.version()).toString());
 
     let browser;
     let page;
@@ -30,17 +31,17 @@ async function login() {
 
         const launchOptions = {
             args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--single-process',
-                '--disable-infobars',
-                '--window-size=1280,720',
-                '--disable-web-security',
-                '--disable-background-timer-throttling',
-                '--disable-backgrounding-occluded-windows',
-                '--disable-renderer-backgrounding'
+              '--no-sandbox',
+              '--disable-setuid-sandbox',
+              '--disable-dev-shm-usage',
+              '--disable-gpu',
+              //'--single-process',
+              '--disable-infobars',
+              '--window-size=1280,720',
+              '--disable-web-security',
+              '--disable-background-timer-throttling',
+              '--disable-backgrounding-occluded-windows',
+              '--disable-renderer-backgrounding'
             ],
             headless: true,
             ignoreHTTPSErrors: true,
@@ -55,6 +56,14 @@ async function login() {
 
         page = await browser.newPage();
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
+        
+        try {
+          await page.goto('https://example.com', { waitUntil: 'networkidle2', timeout: 30000 });
+          console.log('✅ Test de navigation réussi : example.com chargée.');
+        } catch (e) {
+          console.error('❌ Test de navigation échoué:', e.message);
+          throw e;
+        }
 
         const loginUrl = 'https://getallmylinks.com/login';
         let loginSuccess = false;
