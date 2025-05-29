@@ -1,7 +1,6 @@
-# Étape 1 : Utiliser une image légère de Node.js
 FROM node:22-slim
 
-# Étape 2 : Installer les dépendances système nécessaires à Puppeteer
+# Installer les dépendances système nécessaires à Chromium
 RUN apt-get update && apt-get install -y \
     fonts-liberation \
     libasound2 \
@@ -31,24 +30,17 @@ RUN apt-get update && apt-get install -y \
     libxtst6 \
     xdg-utils \
     ca-certificates \
-    wget \
+    curl \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
-# Étape 3 : Définir le répertoire de travail
 WORKDIR /app
 
-# Étape 4 : Copier les fichiers nécessaires pour npm install
-COPY package*.json ./
-
-# Étape 5 : Installer les dépendances Node.js
-RUN npm install
-
-# Étape 6 : Copier le reste de l'application
 COPY . .
 
-# (Optionnel) Exposer un port (au cas où tu utilises express)
+# Installer les dépendances et forcer le téléchargement de Chrome
+RUN npm install && npx puppeteer browsers install chrome
+
 EXPOSE 10000
 
-# Étape 7 : Lancer le bot
 CMD ["node", "bot.js"]
