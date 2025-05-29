@@ -1,9 +1,8 @@
 // Importations de base
+process.env.PUPPETEER_CACHE_DIR = '/opt/render/.cache/puppeteer';
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteer.use(StealthPlugin());
-
-process.env.PUPPETEER_CACHE_DIR = '/opt/render/.cache/puppeteer';
 
 const pTimeout = require('p-timeout');
 

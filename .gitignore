@@ -3,6 +3,9 @@
 
 # Dépendances Node.js
 node_modules/
+.cache/
+node_modules/.cache/
+
 
 # Dossier de données utilisateur de Puppeteer (contient cookies, cache...)
 puppeteer_user_data/
