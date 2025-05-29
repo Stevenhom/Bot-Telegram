@@ -28,25 +28,23 @@ async function login() {
         console.log("🔍 Vérification du cache Puppeteer:", process.env.PUPPETEER_CACHE_DIR || "Non défini");
 
         const launchOptions = {
-            args: [
-              '--no-sandbox',
-              '--disable-setuid-sandbox',
-              '--disable-dev-shm-usage',
-              '--disable-gpu',
-              '--disable-infobars',
-              '--window-size=1280,720',
-              '--disable-web-security',
-              '--disable-background-timer-throttling',
-              '--disable-backgrounding-occluded-windows',
-              '--disable-renderer-backgrounding'
-            ],
-            headless: true,
-            ignoreHTTPSErrors: true,
-        };
-
-        if (IS_RENDER) {
-            launchOptions.executablePath = puppeteer.executablePath();
-        }
+             args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--disable-infobars',
+                '--window-size=1280,720',
+                '--disable-web-security',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-renderer-backgrounding'
+              ],
+              headless: true,
+              ignoreHTTPSErrors: true,
+          };
+        
+        delete launchOptions.executablePath;
 
         console.log(`Options de lancement: ${JSON.stringify(launchOptions, null, 2)}`);
         browser = await puppeteer.launch(launchOptions);
