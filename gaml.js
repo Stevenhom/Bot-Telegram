@@ -1,5 +1,4 @@
 // Importations de base
-  
 const puppeteerExtra = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteerExtra.use(StealthPlugin());
@@ -17,12 +16,12 @@ const IS_RENDER = process.env.RENDER === 'true';
 async function login() {
     const startTime = Date.now();
     console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Début de la connexion dans la fonction login...`);
-
     let browser;
     let page;
-
     try {
+        console.log(`Puppeteer va démarrer avec ${launchOptions.executablePath}`);
         const launchOptions = {
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -36,18 +35,17 @@ async function login() {
                 '--disable-backgrounding-occluded-windows',
                 '--disable-renderer-backgrounding'
             ],
-            headless: 'new',
+            headless: true, // Utilisez 'true' pour exécuter en mode headless
             ignoreHTTPSErrors: true,
             defaultViewport: null
             // PAS d'executablePath - laisse Puppeteer gérer
         };
 
-        console.log('Configuration Puppeteer:', {
+             console.log('Configuration Puppeteer:', {
             isRender: IS_RENDER,
             nodeEnv: process.env.NODE_ENV,
             chromeSource: 'Puppeteer intégré'
         });
-
 
 
         console.log(`Options de lancement: ${JSON.stringify(launchOptions, null, 2)}`);
