@@ -118,6 +118,14 @@ bot.on('text', async (ctx) => {
   }
 });
 
+const { exec } = require('child_process');
+exec('which google-chrome', (error, stdout, stderr) => {
+    if (error) {
+        console.error(`Chrome n'est pas installé ou non trouvé : ${error.message}`);
+    } else {
+        console.log(`Emplacement de Google Chrome : ${stdout.trim()}`);
+    }
+});
 
 const express = require('express');
 const app = express();
