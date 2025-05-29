@@ -2,7 +2,7 @@ services:
   - type: web
     name: telegram-gaml-bot
     plan: free
-    runtime: docker # <--- CECI EST FONDAMENTAL.
+    runtime: docker # <--- C'est la ligne la plus importante !
     buildCommand: npm install
     startCommand: node bot.js
     envVars:
