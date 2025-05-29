@@ -23,7 +23,6 @@ async function login() {
     try {
         // Définition des options Puppeteer AVANT tout usage !
         const launchOptions = {
-            executablePath: '/usr/bin/chromium-browser',
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
