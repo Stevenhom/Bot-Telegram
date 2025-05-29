@@ -1,7 +1,7 @@
-# Utilise une image Node.js de base
+# Utilise une image Node.js légère
 FROM node:22-slim
 
-# Installe les dépendances système nécessaires à Puppeteer
+# Installe les dépendances nécessaires à Puppeteer
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     fonts-liberation \
@@ -38,14 +38,18 @@ RUN apt-get update && apt-get install -y \
     libvulkan1 \
     chromium \
     chromium-driver \
+    google-chrome-stable \
     && rm -rf /var/lib/apt/lists/*
 
-# Installer Puppeteer et forcer le téléchargement de Chrome
-RUN npm install puppeteer --omit=dev && npx puppeteer browsers install chrome
+# Installer Puppeteer sans dépendances inutiles
+RUN npm install puppeteer --omit=dev
 
+# Vérifier les navigateurs installés
 RUN npx puppeteer browsers list
+RUN which chromium && which chromium-browser && which google-chrome-stable
+RUN chmod +x /usr/bin/chromium
 
-RUN which chromium && ls -lh /usr/bin/chromium
+RUN which chromium-browser && which chromium && which google-chrome-stable
 
 # Crée le répertoire de travail
 WORKDIR /app
@@ -61,4 +65,4 @@ COPY . .
 EXPOSE 10000
 
 # Commande de démarrage
-CMD ["node", "bot.js"]
+CMD ["node", "bot.js"]

@@ -1,9 +1,10 @@
 require('dotenv').config();
 const { Telegraf } = require('telegraf');
 const { createLink, getLinkStats, getAllLinksStats, validatePeriod } = require('./gaml');
+const puppeteer = require('puppeteer');
+const { exec } = require("child_process");
+
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
-
-
 const requiredVars = ['TELEGRAM_TOKEN', 'GAML_EMAIL', 'GAML_PASSWORD'];
 const validPeriods = [
   'today', 'yesterday', '7days', 'current_month', 
@@ -17,6 +18,13 @@ requiredVars.forEach((varName) => {
   }
 });
 console.log('🔐 Configuration .env validée !');
+
+console.log("🛠️ Puppeteer cache path:", process.env.PUPPETEER_CACHE_DIR || "Non défini");
+
+// 🛠️ Vérification de Chromium installé sur Render
+exec("which chromium", (error, stdout) => console.log("🔍 Chromium path:", stdout.trim() || "Non trouvé"));
+exec("which chromium-browser", (error, stdout) => console.log("🔍 Chromium-browser path:", stdout.trim() || "Non trouvé"));
+exec("which google-chrome-stable", (error, stdout) => console.log("🔍 Google Chrome path:", stdout.trim() || "Non trouvé"));
 
 const userState = {};
 
@@ -72,7 +80,6 @@ bot.on('text', async (ctx) => {
     try {
       await ctx.reply('🔄 Création du lien en cours, merci de patienter...');
       
-      // Création du lien + description dans la même session
       const shortUrl = await createLink(state.slug, state.url, state.description);
   
       await ctx.reply(`✅ Lien créé avec succès : ${shortUrl}\n📝 Description ajoutée : "${state.description}"`);
@@ -80,7 +87,6 @@ bot.on('text', async (ctx) => {
       await ctx.reply(`❌ Erreur lors de la création ou de l’ajout de la description : ${err.message}`);
     }
   
-    // Réinitialisation de l'état
     delete userState[userId];
   } else if (state.step === 'awaiting_clics_slug') {
     state.slug = messageText;
@@ -102,7 +108,6 @@ bot.on('text', async (ctx) => {
 
     try {
         await ctx.reply("⏳ Veuillez patienter, récupération des statistiques en cours...");
-        // ✅ Correction : getAllLinksStats retourne déjà le message formaté
         const formattedMessage = await getAllLinksStats(messageText);
         if (!formattedMessage || formattedMessage.trim() === '') {
             await ctx.reply("❌ Erreur : Le message formaté est vide.");
@@ -118,14 +123,11 @@ bot.on('text', async (ctx) => {
   }
 });
 
-
 const express = require('express');
 const app = express();
-// Render fournit le port via process.env.PORT
 const port = process.env.PORT || 10000; 
 
 app.get('/', (req, res) => {
-  // Un simple message pour indiquer que le service est vivant
   res.send('Bot is running and alive!');
 });
 
@@ -133,20 +135,17 @@ app.listen(port, () => {
   console.log(`Web server listening on port ${port}`);
 });
 
-// Optionnel : un endpoint pour la vérification de l'état du bot si besoin
 app.get('/health', (req, res) => {
     res.status(200).send('OK');
 });
 
-
 bot.launch({
   polling: {
-    timeout: 300, // 5 minutes en secondes
+    timeout: 300, 
     limit: 100 
   }
 });
 console.log('🤖 Bot Sirenza démarré !');
-console.log("🛠️ Puppeteer cache path:", process.env.PUPPETEER_CACHE_DIR);
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));

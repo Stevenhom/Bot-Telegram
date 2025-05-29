@@ -17,6 +17,19 @@ const pTimeout = require('p-timeout');
 // Configuration des constantes en haut du fichier
 const IS_RENDER = process.env.RENDER === 'true';
 
+const fs = require('fs');
+const findChromiumExecutable = () => {
+  const paths = [
+    '/usr/bin/chromium-browser',
+    '/usr/bin/chromium',
+    '/usr/bin/google-chrome-stable',
+  ];
+  for (const path of paths) {
+    if (fs.existsSync(path)) return path;
+  }
+  throw new Error('Aucun binaire Chromium trouvé');
+};
+
 async function login() {
     const startTime = Date.now();
     console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Début de la connexion dans la fonction login...`);
@@ -28,7 +41,7 @@ async function login() {
         console.log("🔍 Vérification du cache Puppeteer:", process.env.PUPPETEER_CACHE_DIR || "Non défini");
 
         const launchOptions = {
-            executablePath: '/usr/bin/chromium', // Force l'utilisation du Chromium installé via apt-get
+            executablePath: findChromiumExecutable(),
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -47,7 +60,7 @@ async function login() {
         };
 
         console.log(`Options de lancement: ${JSON.stringify(launchOptions, null, 2)}`);
-        browser = await puppeteer.launch(launchOptions);
+        browser = await puppeteerExtra.launch(launchOptions);
         console.log(`✅ Puppeteer utilise ${await browser.version()}`);
 
 
