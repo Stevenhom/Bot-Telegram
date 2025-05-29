@@ -43,6 +43,8 @@ RUN apt-get update && apt-get install -y \
 # Installer Puppeteer et forcer le téléchargement de Chrome
 RUN npm install puppeteer --omit=dev && npx puppeteer browsers install chrome
 
+RUN npx puppeteer browsers list
+
 # Crée le répertoire de travail
 WORKDIR /app
 
