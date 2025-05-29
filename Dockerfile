@@ -1,7 +1,5 @@
-# Utilise une image Node.js légère
 FROM node:22-slim
 
-# Install minimal dependencies for Puppeteer
 RUN apt-get update && apt-get install -y \
         ca-certificates \
         fonts-liberation \
@@ -33,23 +31,20 @@ RUN apt-get update && apt-get install -y \
         xdg-utils \
         libu2f-udev \
         libvulkan1 \
-        --no-install-recommends && \
-        rm -rf /var/lib/apt/lists/*
+    --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
 
-# Installer Puppeteer sans dépendances inutiles
-RUN npm install puppeteer
-
-# Crée le répertoire de travail
 WORKDIR /app
 
-# Copie package.json et package-lock.json pour installer les dépendances
+# Copie package.json et package-lock.json en premier pour profiter du cache Docker
 COPY package*.json ./
 
-# Copie le reste du code
+# Installe les dépendances (dont Puppeteer avec Chromium)
+RUN npm install
+
+# Copie le reste du code source
 COPY . .
 
-# Expose le port si ton application écoute (utile pour health check)
 EXPOSE 10000
 
-# Commande de démarrage
-CMD ["node", "bot.js"]
+CMD ["node", "bot.js"]

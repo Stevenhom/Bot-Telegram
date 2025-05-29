@@ -17,22 +17,10 @@ const pTimeout = require('p-timeout');
 // Configuration des constantes en haut du fichier
 const IS_RENDER = process.env.RENDER === 'true';
 
-const fs = require('fs');
-const findChromiumExecutable = () => {
-  const paths = [
-    '/usr/bin/chromium-browser',
-    '/usr/bin/chromium',
-    '/usr/bin/google-chrome-stable',
-  ];
-  for (const path of paths) {
-    if (fs.existsSync(path)) return path;
-  }
-  throw new Error('Aucun binaire Chromium trouvé');
-};
-
 async function login() {
     const startTime = Date.now();
     console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Début de la connexion dans la fonction login...`);
+    console.log('Chemin Chromium Puppeteer:', puppeteer.executablePath());
 
     let browser;
     let page;
