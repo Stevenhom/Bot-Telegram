@@ -39,7 +39,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update && apt-get install -y chromium
-RUN which chromium || echo "Chromium n'est pas installé correctement"
+RUN find / -name 'chromium*' || echo "Chromium introuvable"
 
 # Crée le répertoire de travail
 WORKDIR /app
