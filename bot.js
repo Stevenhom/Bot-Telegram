@@ -119,12 +119,9 @@ bot.on('text', async (ctx) => {
 });
 
 const { exec } = require('child_process');
-exec('which chromium-browser', (error, stdout, stderr) => {
-    if (error) {
-        console.error(`Chromium non trouvé : ${error.message}`);
-    } else {
-        console.log(`Emplacement de Chromium : ${stdout.trim()}`);
-    }
+exec('find / -name "chromium*" -type f', (error, stdout, stderr) => {
+    if (error) console.error(`Erreur : ${error.message}`);
+    console.log(`Fichiers Chromium trouvés : ${stdout}`);
 });
 
 const express = require('express');

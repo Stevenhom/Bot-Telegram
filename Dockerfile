@@ -5,6 +5,8 @@ FROM node:22-slim
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     fonts-liberation \
+    chromium \
+    chromium-driver \
     libappindicator3-1 \
     libasound2 \
     libatk-bridge2.0-0 \
@@ -39,7 +41,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update && apt-get install -y chromium
-RUN find / -name 'chromium*' -type f || echo "Chromium non trouvé"
+RUN find / -name "chromium*" || echo "Chromium non trouvé"
 RUN dpkg -l | grep chromium || echo "Chromium non installé via dpkg"
 
 # Crée le répertoire de travail
