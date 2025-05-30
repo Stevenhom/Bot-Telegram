@@ -1,6 +1,6 @@
 # Dossiers à ignorer
 node_modules
-.cache
+#.cache
 dist
 coverage
 tmp
