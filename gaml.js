@@ -18,14 +18,15 @@ async function login() {
     const startTime = Date.now();
     console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Début de la connexion dans la fonction login...`);
 
-    let executablePath = puppeteer.executablePath();
+    // **IMPORTANT** : retire la ligne 'executablePath = /opt/render/.cache/...'
+    // Puppeteer doit maintenant trouver le chemin automatiquement via PUPPETEER_EXECUTABLE_PATH
+    // défini dans le Dockerfile. Si tu vois toujours ce log, c'est que quelque chose ne va pas
+    // avec la variable d'environnement ou le Dockerfile.
+    const executablePath = puppeteer.executablePath();
     if (!executablePath) {
-        console.warn('⚠️ Chemin Chromium non trouvé via puppeteer.executablePath(), utilisation d\'un chemin par défaut Render...');
-        // Ce chemin est celui où Puppeteer va télécharger Chrome si tu n'as pas de Dockerfile qui l'installe ailleurs.
-        // Si ton Dockerfile installe google-chrome-stable, PUPPETEER_EXECUTABLE_PATH doit pointer vers /usr/bin/google-chrome-stable
-        // L'override dans package.json et le Dockerfile combinés devraient faire que puppeteer.executablePath() trouve le bon chemin.
-        // On ne devrait plus avoir besoin de cette ligne si le Dockerfile est correct et utilisé.
-        executablePath = '/opt/render/.cache/puppeteer/chrome/linux-136.0.7103.94/chrome-linux64/chrome';
+        // Cette erreur devrait maintenant se déclencher si le Dockerfile/PUPPETEER_EXECUTABLE_PATH
+        // ne configure pas correctement Puppeteer.
+        throw new Error('❌ Erreur: Puppeteer n\'a pas trouvé le chemin de l\'exécutable Chrome. Vérifiez le Dockerfile et la variable d\'environnement PUPPETEER_EXECUTABLE_PATH.');
     }
 
     console.log('Chemin Chromium Puppeteer:', executablePath);
@@ -44,9 +45,9 @@ async function login() {
             '--disable-backgrounding-occluded-windows',
             '--disable-renderer-backgrounding'
         ],
-        headless: 'new', // Utilisation de 'new' pour la dernière version de headless
+        headless: 'new',
         ignoreHTTPSErrors: true,
-        defaultViewport: null // Laisse Puppeteer gérer la taille de la fenêtre basée sur window-size
+        defaultViewport: null
     };
 
     let browser;
@@ -61,11 +62,8 @@ async function login() {
 
         page = await browser.newPage();
 
-        await page.setUserAgent(
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
-            'AppleWebKit/537.36 (KHTML, like Gecko) ' +
-            'Chrome/125.0.0.0 Safari/537.36'
-        );
+        // Utilisation d'une variable d'environnement pour l'User-Agent, sinon un User-Agent par défaut.
+        await page.setUserAgent(process.env.USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
 
         try {
             await page.goto('https://getallmylinks.com', { waitUntil: 'domcontentloaded', timeout: 90000 });
@@ -82,7 +80,7 @@ async function login() {
             try {
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] 🔒 Tentative de connexion #${attempt}`);
 
-                // S'assurer d'être sur la page de login
+                // Assurer d'être sur la page de login, en attendant la fin du chargement du DOM.
                 await Promise.all([
                     page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60000 }),
                     page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 60000 })
@@ -90,63 +88,85 @@ async function login() {
 
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Page de connexion chargée. URL: ${page.url()}`);
 
-                await page.waitForSelector('input[name="email"]', { timeout: 30000, visible: true });
-                await page.waitForSelector('input[name="password"]', { timeout: 30000, visible: true });
+                // Attendre que les champs email et password soient bien présents et visibles, avec un timeout généreux.
+                await page.waitForSelector('input[name="email"]', { timeout: 45000, visible: true });
+                await page.waitForSelector('input[name="password"]', { timeout: 45000, visible: true });
 
+                // Vider les champs avant de taper pour éviter d'ajouter à du texte existant.
                 await page.click('input[name="email"]', { clickCount: 3 });
                 await page.keyboard.press('Backspace');
-                await humanDelay(200);
+                await humanDelay(300); // Délai après effacement
 
                 await page.type('input[name="email"]', process.env.GAML_EMAIL, {
                     delay: 20 + Math.random() * 50
                 });
 
-                await humanDelay(300 + Math.random() * 300);
+                await humanDelay(500 + Math.random() * 500); // Délai plus variable
 
                 await page.type('input[name="password"]', process.env.GAML_PASSWORD, {
                     delay: 20 + Math.random() * 50
                 });
 
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Identifiants saisis.`);
-                await humanDelay(500);
+                await humanDelay(2000); // Délai plus long après saisie, avant soumission.
 
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Clic sur le bouton de soumission et attente de navigation...`);
+                // Soumettre le formulaire en appuyant sur 'Entrée' après le champ password, c'est souvent plus robuste.
+                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Soumission du formulaire par touche Entrée...`);
                 await Promise.all([
-                    page.click('button[type="submit"]'),
-                    // Augmenter le timeout ici, et utiliser 'domcontentloaded' si 'networkidle2' est trop strict
-                    page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 90000 }) // Augmenté à 90s
+                    page.keyboard.press('Enter'), // Simule la touche Entrée pour soumettre le formulaire
+                    // Attendre la navigation après la soumission, en utilisant domcontentloaded et un timeout de 90s.
+                    page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 90000 })
                 ]);
 
                 const currentUrl = page.url();
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] URL après soumission: ${currentUrl}`);
-                await humanDelay(2000);
+                await humanDelay(3000); // Délai après redirection pour s'assurer que la page est stable.
 
-                if (currentUrl.includes('/account') || currentUrl.includes('/dashboard')) { // Ajout de /dashboard au cas où
+                // Vérifier si la redirection a réussi vers le compte ou le tableau de bord.
+                if (currentUrl.includes('/account') || currentUrl.includes('/dashboard')) {
                     loginSuccess = true;
                     console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ✅ Connexion réussie !`);
                     break;
                 } else {
                     console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ⚠️ Redirection incorrecte après login. URL actuelle: ${currentUrl}`);
-                    // Tente de prendre une capture d'écran pour diagnostiquer la page de redirection inattendue
-                    const screenshotPath = `login_fail_attempt_${attempt}_${Date.now()}.png`;
-                    await page.screenshot({ path: screenshotPath }).catch(e => console.error("Erreur lors de la capture d'écran:", e.message));
-                    console.log(`Capture d'écran tentée: ${screenshotPath}`);
+
+                    // Tenter de lire les messages d'erreur courants sur la page (si le login échoue).
+                    const errorMessage = await page.evaluate(() => {
+                        // Chercher des éléments d'alerte, de message d'erreur ou de texte indiquant un échec de login.
+                        const alertDiv = document.querySelector('.alert.alert-danger'); // Exemple courant
+                        if (alertDiv) return alertDiv.innerText.trim();
+
+                        const formError = document.querySelector('.error-message'); // Autre exemple
+                        if (formError) return formError.innerText.trim();
+
+                        // Ajoutez d'autres sélecteurs spécifiques à getallmylinks.com si tu en trouves en inspectant la page de login en cas d'erreur.
+                        
+                        return null; // Si aucun message d'erreur explicite n'est trouvé.
+                    });
+
+                    if (errorMessage) {
+                        console.error(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Message d'erreur détecté sur la page: "${errorMessage}"`);
+                        throw new Error(`Login échoué: ${errorMessage}`);
+                    } else {
+                        console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Aucun message d'erreur explicite détecté, mais pas de redirection. Le site est peut-être bloqué ou a un captcha.`);
+                    }
                 }
 
             } catch (error) {
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ⚠️ Tentative ${attempt} échouée:`, error.message);
                 if (browser && browser.isConnected()) {
                     // Tente de recharger la page si l'erreur n'est pas un timeout de goto/waitForNavigation sur la page de login elle-même
+                    // ou un problème réseau général.
                     if (!error.message.includes('TimeoutError') && !error.message.includes('net::ERR_')) {
                         await page.reload({ waitUntil: 'domcontentloaded' }).catch(e => console.log("Erreur lors du rechargement de la page de login:", e.message));
                     }
                 }
-                await humanDelay(3000); // Délai avant la prochaine tentative
+                await humanDelay(5000); // Délai plus long avant la prochaine tentative en cas d'erreur.
             }
         }
 
         if (!loginSuccess) {
-            throw new Error('Échec de la connexion après 3 tentatives.');
+            throw new Error('Échec de la connexion après 3 tentatives. Vérifiez vos identifiants ou le comportement du site web.');
         }
 
         console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ✅ Fin de la fonction login.`);
