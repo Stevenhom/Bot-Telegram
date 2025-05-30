@@ -21,10 +21,8 @@ console.log('🔐 Configuration .env validée !');
 
 console.log("🛠️ Puppeteer cache path:", process.env.PUPPETEER_CACHE_DIR || "Non défini");
 
-// 🛠️ Vérification de Chromium installé sur Render
-exec("which chromium", (error, stdout) => console.log("🔍 Chromium path:", stdout.trim() || "Non trouvé"));
-exec("which chromium-browser", (error, stdout) => console.log("🔍 Chromium-browser path:", stdout.trim() || "Non trouvé"));
-exec("which google-chrome-stable", (error, stdout) => console.log("🔍 Google Chrome path:", stdout.trim() || "Non trouvé"));
+console.log("📍 Chromium utilisé par Puppeteer:", puppeteer.executablePath());
+
 
 const userState = {};
 
