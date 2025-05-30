@@ -5,22 +5,26 @@ puppeteer.use(StealthPlugin());
 
 const pTimeout = require('p-timeout');
 
-// Délai humanisé
-const humanDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+  // Fonction d'attente pour les délais humanisés
+  const humanDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Constante environnement Render
+  // Définition de la fonction wait standard (pour compatibilité avec le reste du code)
+  const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms)); // Assurez-vous que cette fonction est bien utilisée ailleurs ou supprimez-la si inutile
+
+// Configuration des constantes en haut du fichier
 const IS_RENDER = process.env.RENDER === 'true';
 
 async function login() {
     const startTime = Date.now();
-    console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Début de la connexion...`);
+    console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Début de la connexion dans la fonction login...`);
 
     let executablePath = puppeteer.executablePath();
     if (!executablePath) {
-        console.warn('⚠️ Chemin Chromium non trouvé via puppeteer.executablePath(), utilisation d\'un chemin par défaut...');
+        console.warn('⚠️ Chemin Chromium non trouvé via puppeteer.executablePath(), utilisation d\'un chemin par défaut Render...');
         executablePath = '/opt/render/.cache/puppeteer/chrome/linux-136.0.7103.94/chrome-linux64/chrome';
     }
+
+    console.log('Chemin Chromium Puppeteer:', executablePath);
 
     const launchOptions = {
         executablePath,
@@ -40,6 +44,8 @@ async function login() {
         ignoreHTTPSErrors: true,
     };
 
+    console.log(`Options de lancement: ${JSON.stringify(launchOptions, null, 2)}`);
+
     let browser;
     let page;
 
@@ -48,15 +54,21 @@ async function login() {
         const version = await browser.version();
         console.log('Version Chrome:', version);
 
-        page = await browser.newPage();
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
+        console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Navigateur lancé`);
 
-        // Test initial
+        page = await browser.newPage();
+
+        await page.setUserAgent(
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+            'AppleWebKit/537.36 (KHTML, like Gecko) ' +
+            'Chrome/125.0.0.0 Safari/537.36'
+        );
+
         try {
             await page.goto('https://getallmylinks.com', { waitUntil: 'domcontentloaded', timeout: 90000 });
-            console.log('✅ Page principale chargée.');
+            console.log('✅ Test de navigation réussi : getallmylinks.com chargée.');
         } catch (e) {
-            console.error('❌ Échec de chargement de la page :', e.message);
+            console.error('❌ Test de navigation échoué:', e.message);
             throw e;
         }
 
@@ -65,12 +77,14 @@ async function login() {
 
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Tentative #${attempt}`);
+                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] 🔒 Tentative de connexion #${attempt}`);
 
                 await Promise.all([
                     page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60000 }),
                     page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 60000 })
                 ]);
+
+                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Page de connexion chargée.`);
 
                 await page.waitForSelector('input[name="email"]', { timeout: 30000, visible: true });
                 await page.waitForSelector('input[name="password"]', { timeout: 30000, visible: true });
@@ -89,6 +103,7 @@ async function login() {
                     delay: 20 + Math.random() * 50
                 });
 
+                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Identifiants saisis.`);
                 await humanDelay(500);
 
                 await Promise.all([
@@ -97,7 +112,7 @@ async function login() {
                 ]);
 
                 const currentUrl = page.url();
-                console.log(`URL après soumission: ${currentUrl}`);
+                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] URL actuelle après soumission: ${currentUrl}`);
 
                 await humanDelay(2000);
 
@@ -106,13 +121,13 @@ async function login() {
                     console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ✅ Connexion réussie !`);
                     break;
                 } else {
-                    console.log('⚠️ Redirection inattendue après connexion.');
+                    console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ⚠️ Non redirigé vers /account.`);
                 }
 
             } catch (error) {
-                console.log(`⚠️ Échec tentative ${attempt} : ${error.message}`);
+                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ⚠️ Tentative ${attempt} échouée:`, error.message);
                 if (browser && browser.isConnected()) {
-                    await page.reload({ waitUntil: 'domcontentloaded' }).catch(e => console.log("Erreur reload:", e.message));
+                    await page.reload({ waitUntil: 'domcontentloaded' }).catch(e => console.log("Erreur lors du rechargement:", e.message));
                 }
                 await humanDelay(3000);
             }
@@ -126,21 +141,15 @@ async function login() {
         return { browser, page };
 
     } catch (error) {
-        console.error(`❌ Erreur login : ${error.message}`);
+        console.error(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ❌ Erreur dans login:`, error.message);
         if (browser && browser.isConnected()) await browser.close();
-        throw new Error(`Login échoué : ${error.message}`);
+        throw new Error(`Échec final dans login: ${error.message}`);
     }
 }
 
-// Encapsulation avec timeout
+// Encapsulation avec timeout global
 async function safeLoginWithTimeout() {
-    try {
-        const { browser, page } = await pTimeout(login(), 90000, '⏰ Timeout après 90s.');
-        return { browser, page };
-    } catch (err) {
-        console.error(err.message);
-        return null;
-    }
+    return await pTimeout(login(), 90000, '⏰ Timeout: la fonction login() a dépassé 90 secondes.');
 }
 
 
@@ -1277,4 +1286,4 @@ async function getAllLinkSlugs(page) {
     return message;
 }
 
-module.exports = { createLink, getLinkStats, getAllLinksStats, validatePeriod, formatAllStatsMessage, safeLoginWithTimeout  };
+module.exports = { createLink, getLinkStats, getAllLinksStats, validatePeriod, formatAllStatsMessage };
