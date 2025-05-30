@@ -79,8 +79,7 @@ async function login() {
             try {
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] 🔒 Tentative de connexion #${attempt}`);
 
-                // 1. Navigation directe vers la page de connexion
-                // On retire la navigation initiale sur getallmylinks.com et les scrolls inutiles
+                // Navigation directe vers la page de connexion
                 await Promise.all([
                     page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60000 }),
                     page.goto(loginUrl, {
@@ -90,56 +89,42 @@ async function login() {
                 ]);
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Page de connexion chargée.`);
 
-                // Attendre que les champs d'email et de mot de passe soient visibles
                 await page.waitForSelector('input[name="email"]', { timeout: 30000, visible: true });
                 await page.waitForSelector('input[name="password"]', { timeout: 30000, visible: true });
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Champs de formulaire trouvés.`);
 
-                // Saisie de l'email
-                await page.click('input[name="email"]', { clickCount: 3 }); // Sélectionne tout le texte
-                await page.keyboard.press('Backspace'); // Supprime le texte
-                await humanDelay(200); // Petit délai après la suppression
+                await page.click('input[name="email"]', { clickCount: 3 });
+                await page.keyboard.press('Backspace');
+                await humanDelay(200);
                 await page.type('input[name="email"]', process.env.GAML_EMAIL, {
-                    delay: 20 + Math.random() * 50 // Délai de frappe légèrement réduit
+                    delay: 20 + Math.random() * 50
                 });
-                await humanDelay(300 + Math.random() * 300); // Délai réduit
+                await humanDelay(300 + Math.random() * 300);
 
-                // Saisie du mot de passe
                 await page.type('input[name="password"]', process.env.GAML_PASSWORD, {
-                    delay: 20 + Math.random() * 50 // Délai de frappe légèrement réduit
+                    delay: 20 + Math.random() * 50
                 });
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Identifiants saisis.`);
 
-                await humanDelay(500); // Délai avant le clic
+                await humanDelay(500);
 
-                // 2. Clic sur le bouton de soumission et attente de la navigation
-                // Changement de 'domcontentloaded' à 'networkidle2' pour une meilleure détection de la fin du chargement après redirection
                 await Promise.all([
                     page.click('button[type="submit"]'),
-                    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 45000 }) // Augmente le timeout pour la navigation post-soumission
+                    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 45000 })
                 ]);
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Formulaire soumis.`);
 
-                // 3. Debugging de la redirection après soumission (pour la première tentative échouée)
                 const currentUrl = page.url();
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] URL actuelle après soumission: ${currentUrl}`);
 
-                // Si le site ne redirige pas immédiatement, attends un peu plus
-                await humanDelay(2000); // Délai pour permettre la redirection ou l'affichage d'erreurs
+                await humanDelay(2000);
 
-                // Re-vérifie l'URL après un délai si nécessaire
                 if (page.url().includes('/account')) {
                     loginSuccess = true;
                     console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Redirection vers /account détectée. Connexion réussie !`);
-                    break; // Sort de la boucle si la connexion est réussie
+                    break;
                 } else {
-                    // Si l'URL n'est pas celle attendue, il peut y avoir une erreur ou un CAPTCHA
                     console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ⚠️ Non redirigé vers /account après la tentative ${attempt}.`);
-                    // Optionnel: capture d'écran pour le débogage
-                    // await page.screenshot({ path: `debug_login_attempt_${attempt}_${Date.now()}.png` });
-                    // Optionnel: affichage du contenu HTML pour les messages d'erreur
-                    // const pageContent = await page.content();
-                    // console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Contenu de la page:`, pageContent.substring(0, 500)); // Affiche les 500 premiers caractères
                 }
 
             } catch (error) {
@@ -147,7 +132,7 @@ async function login() {
                 if (browser && browser.isConnected()) {
                     await page.reload({ waitUntil: 'domcontentloaded' }).catch(e => console.log("Erreur lors du rechargement de la page:", e.message));
                 }
-                await humanDelay(3000); // Attendre avant de réessayer
+                await humanDelay(3000);
             }
         }
 
