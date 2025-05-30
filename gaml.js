@@ -21,6 +21,10 @@ async function login() {
     let executablePath = puppeteer.executablePath();
     if (!executablePath) {
         console.warn('⚠️ Chemin Chromium non trouvé via puppeteer.executablePath(), utilisation d\'un chemin par défaut Render...');
+        // Ce chemin est celui où Puppeteer va télécharger Chrome si tu n'as pas de Dockerfile qui l'installe ailleurs.
+        // Si ton Dockerfile installe google-chrome-stable, PUPPETEER_EXECUTABLE_PATH doit pointer vers /usr/bin/google-chrome-stable
+        // L'override dans package.json et le Dockerfile combinés devraient faire que puppeteer.executablePath() trouve le bon chemin.
+        // On ne devrait plus avoir besoin de cette ligne si le Dockerfile est correct et utilisé.
         executablePath = '/opt/render/.cache/puppeteer/chrome/linux-136.0.7103.94/chrome-linux64/chrome';
     }
 
@@ -40,11 +44,10 @@ async function login() {
             '--disable-backgrounding-occluded-windows',
             '--disable-renderer-backgrounding'
         ],
-        headless: true,
+        headless: 'new', // Utilisation de 'new' pour la dernière version de headless
         ignoreHTTPSErrors: true,
+        defaultViewport: null // Laisse Puppeteer gérer la taille de la fenêtre basée sur window-size
     };
-
-    console.log(`Options de lancement: ${JSON.stringify(launchOptions, null, 2)}`);
 
     let browser;
     let page;
@@ -68,7 +71,7 @@ async function login() {
             await page.goto('https://getallmylinks.com', { waitUntil: 'domcontentloaded', timeout: 90000 });
             console.log('✅ Test de navigation réussi : getallmylinks.com chargée.');
         } catch (e) {
-            console.error('❌ Test de navigation échoué:', e.message);
+            console.error('❌ Test de navigation échoué lors du goto initial:', e.message);
             throw e;
         }
 
@@ -79,12 +82,13 @@ async function login() {
             try {
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] 🔒 Tentative de connexion #${attempt}`);
 
+                // S'assurer d'être sur la page de login
                 await Promise.all([
                     page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60000 }),
                     page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 60000 })
                 ]);
 
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Page de connexion chargée.`);
+                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Page de connexion chargée. URL: ${page.url()}`);
 
                 await page.waitForSelector('input[name="email"]', { timeout: 30000, visible: true });
                 await page.waitForSelector('input[name="password"]', { timeout: 30000, visible: true });
@@ -106,30 +110,38 @@ async function login() {
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Identifiants saisis.`);
                 await humanDelay(500);
 
+                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Clic sur le bouton de soumission et attente de navigation...`);
                 await Promise.all([
                     page.click('button[type="submit"]'),
-                    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 45000 })
+                    // Augmenter le timeout ici, et utiliser 'domcontentloaded' si 'networkidle2' est trop strict
+                    page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 90000 }) // Augmenté à 90s
                 ]);
 
                 const currentUrl = page.url();
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] URL actuelle après soumission: ${currentUrl}`);
-
+                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] URL après soumission: ${currentUrl}`);
                 await humanDelay(2000);
 
-                if (currentUrl.includes('/account')) {
+                if (currentUrl.includes('/account') || currentUrl.includes('/dashboard')) { // Ajout de /dashboard au cas où
                     loginSuccess = true;
                     console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ✅ Connexion réussie !`);
                     break;
                 } else {
-                    console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ⚠️ Non redirigé vers /account.`);
+                    console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ⚠️ Redirection incorrecte après login. URL actuelle: ${currentUrl}`);
+                    // Tente de prendre une capture d'écran pour diagnostiquer la page de redirection inattendue
+                    const screenshotPath = `login_fail_attempt_${attempt}_${Date.now()}.png`;
+                    await page.screenshot({ path: screenshotPath }).catch(e => console.error("Erreur lors de la capture d'écran:", e.message));
+                    console.log(`Capture d'écran tentée: ${screenshotPath}`);
                 }
 
             } catch (error) {
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ⚠️ Tentative ${attempt} échouée:`, error.message);
                 if (browser && browser.isConnected()) {
-                    await page.reload({ waitUntil: 'domcontentloaded' }).catch(e => console.log("Erreur lors du rechargement:", e.message));
+                    // Tente de recharger la page si l'erreur n'est pas un timeout de goto/waitForNavigation sur la page de login elle-même
+                    if (!error.message.includes('TimeoutError') && !error.message.includes('net::ERR_')) {
+                        await page.reload({ waitUntil: 'domcontentloaded' }).catch(e => console.log("Erreur lors du rechargement de la page de login:", e.message));
+                    }
                 }
-                await humanDelay(3000);
+                await humanDelay(3000); // Délai avant la prochaine tentative
             }
         }
 
@@ -141,8 +153,11 @@ async function login() {
         return { browser, page };
 
     } catch (error) {
-        console.error(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ❌ Erreur dans login:`, error.message);
-        if (browser && browser.isConnected()) await browser.close();
+        console.error(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ❌ Erreur critique dans login:`, error.message);
+        if (browser && browser.isConnected()) {
+            await browser.close();
+            console.log("Navigateur fermé après erreur critique.");
+        }
         throw new Error(`Échec final dans login: ${error.message}`);
     }
 }
