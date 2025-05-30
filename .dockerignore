@@ -1,5 +1,28 @@
+# Dossiers à ignorer
 node_modules
+.cache
+dist
+coverage
+tmp
+logs
+
+# Fichiers à ignorer
 npm-debug.log
+yarn-error.log
+pnpm-debug.log
+
+# Docker-related
 Dockerfile
 .dockerignore
+
+# Git & VCS
 .git
+.gitignore
+.gitattributes
+
+# IDE & OS files
+.vscode
+.idea
+*.swp
+.DS_Store
+Thumbs.db

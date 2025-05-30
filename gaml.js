@@ -1,5 +1,4 @@
 // Importations de base
-process.env.PUPPETEER_CACHE_DIR = '/opt/render/.cache/puppeteer';
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteer.use(StealthPlugin());
@@ -18,49 +17,58 @@ const IS_RENDER = process.env.RENDER === 'true';
 async function login() {
     const startTime = Date.now();
     console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Début de la connexion dans la fonction login...`);
-    console.log('Chemin Chromium Puppeteer:', puppeteer.executablePath());
+
+    let executablePath = puppeteer.executablePath();
+    if (!executablePath) {
+        console.warn('⚠️ Chemin Chromium non trouvé via puppeteer.executablePath(), utilisation d\'un chemin par défaut Render...');
+        executablePath = '/opt/render/.cache/puppeteer/chrome/linux-136.0.7103.94/chrome-linux64/chrome'; // adapte si besoin
+    }
+    console.log('Chemin Chromium Puppeteer:', executablePath);
+
+    const launchOptions = {
+        executablePath,
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-infobars',
+            '--window-size=1280,720',
+            '--disable-web-security',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding'
+        ],
+        headless: true,
+        ignoreHTTPSErrors: true,
+    };
+
+    console.log(`Options de lancement: ${JSON.stringify(launchOptions, null, 2)}`);
 
     let browser;
     let page;
 
     try {
-        console.log("🔍 Vérification du cache Puppeteer:", process.env.PUPPETEER_CACHE_DIR || "Non défini");
-
-        const launchOptions = {
-             args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--disable-infobars',
-                '--window-size=1280,720',
-                '--disable-web-security',
-                '--disable-background-timer-throttling',
-                '--disable-backgrounding-occluded-windows',
-                '--disable-renderer-backgrounding'
-              ],
-              headless: true,
-              ignoreHTTPSErrors: true,
-          };
-        
-        delete launchOptions.executablePath;
-
-        console.log(`Options de lancement: ${JSON.stringify(launchOptions, null, 2)}`);
         browser = await puppeteer.launch(launchOptions);
-        console.log('Version Chrome:', await (await browser.version()).toString());
-
+        const version = await browser.version();
+        console.log('Version Chrome:', version);
 
         console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Navigateur lancé`);
 
         page = await browser.newPage();
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
-        
+
+        await page.setUserAgent(
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+            'AppleWebKit/537.36 (KHTML, like Gecko) ' +
+            'Chrome/125.0.0.0 Safari/537.36'
+        );
+
         try {
-          await page.goto('https://example.com', { waitUntil: 'networkidle2', timeout: 30000 });
-          console.log('✅ Test de navigation réussi : example.com chargée.');
+            await page.goto('https://getallmylinks.com', { waitUntil: 'networkidle2', timeout: 30000 });
+            console.log('✅ Test de navigation réussi : getallmylinks.com chargée.');
         } catch (e) {
-          console.error('❌ Test de navigation échoué:', e.message);
-          throw e;
+            console.error('❌ Test de navigation échoué:', e.message);
+            throw e;
         }
 
         const loginUrl = 'https://getallmylinks.com/login';
