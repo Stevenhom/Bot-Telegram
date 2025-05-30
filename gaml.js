@@ -21,8 +21,9 @@ async function login() {
     let executablePath = puppeteer.executablePath();
     if (!executablePath) {
         console.warn('⚠️ Chemin Chromium non trouvé via puppeteer.executablePath(), utilisation d\'un chemin par défaut Render...');
-        executablePath = '/opt/render/.cache/puppeteer/chrome/linux-136.0.7103.94/chrome-linux64/chrome'; // adapte si besoin
+        executablePath = '/opt/render/.cache/puppeteer/chrome/linux-136.0.7103.94/chrome-linux64/chrome';
     }
+
     console.log('Chemin Chromium Puppeteer:', executablePath);
 
     const launchOptions = {
@@ -74,63 +75,59 @@ async function login() {
         const loginUrl = 'https://getallmylinks.com/login';
         let loginSuccess = false;
 
-        // Boucle pour les tentatives de connexion
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] 🔒 Tentative de connexion #${attempt}`);
 
-                // Navigation directe vers la page de connexion
                 await Promise.all([
                     page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60000 }),
-                    page.goto(loginUrl, {
-                        waitUntil: 'domcontentloaded',
-                        timeout: 60000
-                    })
+                    page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 60000 })
                 ]);
+
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Page de connexion chargée.`);
 
                 await page.waitForSelector('input[name="email"]', { timeout: 30000, visible: true });
                 await page.waitForSelector('input[name="password"]', { timeout: 30000, visible: true });
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Champs de formulaire trouvés.`);
 
                 await page.click('input[name="email"]', { clickCount: 3 });
                 await page.keyboard.press('Backspace');
                 await humanDelay(200);
+
                 await page.type('input[name="email"]', process.env.GAML_EMAIL, {
                     delay: 20 + Math.random() * 50
                 });
+
                 await humanDelay(300 + Math.random() * 300);
 
                 await page.type('input[name="password"]', process.env.GAML_PASSWORD, {
                     delay: 20 + Math.random() * 50
                 });
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Identifiants saisis.`);
 
+                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Identifiants saisis.`);
                 await humanDelay(500);
 
                 await Promise.all([
                     page.click('button[type="submit"]'),
                     page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 45000 })
                 ]);
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Formulaire soumis.`);
 
                 const currentUrl = page.url();
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] URL actuelle après soumission: ${currentUrl}`);
 
                 await humanDelay(2000);
 
-                if (page.url().includes('/account')) {
+                if (currentUrl.includes('/account')) {
                     loginSuccess = true;
-                    console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Redirection vers /account détectée. Connexion réussie !`);
+                    console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ✅ Connexion réussie !`);
                     break;
                 } else {
-                    console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ⚠️ Non redirigé vers /account après la tentative ${attempt}.`);
+                    console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ⚠️ Non redirigé vers /account.`);
                 }
 
             } catch (error) {
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ⚠️ Tentative ${attempt} échouée (exception):`, error.message);
+                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ⚠️ Tentative ${attempt} échouée:`, error.message);
                 if (browser && browser.isConnected()) {
-                    await page.reload({ waitUntil: 'domcontentloaded' }).catch(e => console.log("Erreur lors du rechargement de la page:", e.message));
+                    await page.reload({ waitUntil: 'domcontentloaded' }).catch(e => console.log("Erreur lors du rechargement:", e.message));
                 }
                 await humanDelay(3000);
             }
@@ -140,15 +137,21 @@ async function login() {
             throw new Error('Échec de la connexion après 3 tentatives.');
         }
 
-        console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ✅ Connexion réussie, fin de la fonction login.`);
+        console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ✅ Fin de la fonction login.`);
         return { browser, page };
 
     } catch (error) {
-        console.error(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ❌ Erreur critique dans login:`, error);
+        console.error(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ❌ Erreur dans login:`, error.message);
         if (browser && browser.isConnected()) await browser.close();
         throw new Error(`Échec final dans login: ${error.message}`);
     }
 }
+
+// Encapsulation avec timeout global
+async function safeLoginWithTimeout() {
+    return await pTimeout(login(), 90000, '⏰ Timeout: la fonction login() a dépassé 90 secondes.');
+}
+
 
 // Version modifiée de createLink qui utilise le browser et page de login
 async function createLink(slug, url, description) {
