@@ -65,7 +65,7 @@ async function login() {
         );
 
         try {
-            await page.goto('https://getallmylinks.com', { waitUntil: 'networkidle2', timeout: 30000 });
+            await page.goto('https://getallmylinks.com', { waitUntil: 'domcontentloaded', timeout: 90000 });
             console.log('✅ Test de navigation réussi : getallmylinks.com chargée.');
         } catch (e) {
             console.error('❌ Test de navigation échoué:', e.message);
