@@ -1,46 +1,30 @@
-FROM node:22-slim
-
-# Installer les dépendances système nécessaires à Chromium
+# Prérequis : assure-toi que tu installes les deps Puppeteer/Chrome
 RUN apt-get update && apt-get install -y \
+    wget \
+    unzip \
     fonts-liberation \
+    libappindicator3-1 \
     libasound2 \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
-    libcairo2 \
     libcups2 \
     libdbus-1-3 \
-    libexpat1 \
-    libfontconfig1 \
-    libgbm1 \
     libgdk-pixbuf2.0-0 \
-    libglib2.0-0 \
-    libgtk-3-0 \
     libnspr4 \
     libnss3 \
-    libpango-1.0-0 \
-    libpangocairo-1.0-0 \
-    libx11-6 \
+    libx11-xcb1 \
     libxcomposite1 \
     libxdamage1 \
-    libxext6 \
-    libxfixes3 \
     libxrandr2 \
-    libxrender1 \
-    libxss1 \
-    libxtst6 \
     xdg-utils \
-    ca-certificates \
-    curl \
-    --no-install-recommends && \
-    rm -rf /var/lib/apt/lists/*
+    --no-install-recommends
 
-WORKDIR /app
+# Définir les variables Puppeteer
+ENV PUPPETEER_SKIP_DOWNLOAD=false
+ENV PUPPETEER_CACHE_DIR=/app/.cache/puppeteer
 
-COPY . .
+# Créer le dossier cache
+RUN mkdir -p /app/.cache/puppeteer
 
-# Installer les dépendances et forcer le téléchargement de Chrome
+# Installer les dépendances et forcer le téléchargement de Chromium
 RUN npm install && npx puppeteer browsers install chrome
-
-EXPOSE 10000
-
-CMD ["node", "bot.js"]
