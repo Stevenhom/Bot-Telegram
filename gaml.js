@@ -16,27 +16,22 @@ const IS_RENDER = process.env.RENDER === 'true';
 
 async function login() {
     const startTime = Date.now();
-    console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Début de la connexion dans la fonction login...`);
+    console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Début de la connexion...`);
 
-    const resolvedExecutablePath = puppeteer.executablePath();
-    if (resolvedExecutablePath) {
-        console.log('✅ Chemin Chromium Puppeteer résolu automatiquement :', resolvedExecutablePath);
-    } else {
-        console.warn('⚠️ Aucun chemin résolu pour Puppeteer. Assurez-vous que PUPPETEER_EXECUTABLE_PATH est bien défini.');
-    }
-
+    // Configuration Docker-spécifique pour Render
     const launchOptions = {
+        executablePath: '/usr/bin/chromium',
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
+            '--single-process',
+            '--no-zygote',
             '--disable-gpu',
-            '--disable-infobars',
-            '--window-size=1280,720',
-            '--disable-web-security',
-            '--disable-background-timer-throttling',
-            '--disable-backgrounding-occluded-windows',
-            '--disable-renderer-backgrounding'
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--disable-setuid-sandbox',
+            '--proxy-server="direct://"',
+            '--proxy-bypass-list=*'
         ],
         headless: 'new',
         ignoreHTTPSErrors: true,
@@ -47,108 +42,79 @@ async function login() {
     let page;
 
     try {
+        console.log('Lancement de Chromium avec options:', launchOptions);
         browser = await puppeteer.launch(launchOptions);
         console.log('Version Chrome:', await browser.version());
-        console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Navigateur lancé`);
-
+        
         page = await browser.newPage();
-        await page.setUserAgent(
-            process.env.USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
-        );
+        await page.setUserAgent(process.env.USER_AGENT);
+        await page.setExtraHTTPHeaders({ 'Accept-Language': 'fr-FR,fr;q=0.9' });
 
-        await page.goto('https://getallmylinks.com', { waitUntil: 'domcontentloaded', timeout: 90000 });
-        console.log('✅ Test de navigation réussi : getallmylinks.com chargée.');
+        // Debugging des requêtes
+        await page.setRequestInterception(true);
+        page.on('request', (req) => req.continue());
 
+        // 1. Chargement initial
+        await page.goto('https://getallmylinks.com', { 
+            waitUntil: 'networkidle0',
+            timeout: 90000
+        });
+        console.log('Page chargée:', await page.title());
+
+        // 2. Processus de connexion
         const loginUrl = 'https://getallmylinks.com/login';
         let loginSuccess = false;
 
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] 🔒 Tentative de connexion #${attempt}`);
+                console.log(`Tentative ${attempt}/3`);
+                await page.goto(loginUrl, { waitUntil: 'networkidle0', timeout: 60000 });
 
-                await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+                // Méthode ultra-robuste pour détecter les champs
+                await page.waitForFunction(() => {
+                    const email = document.querySelector('input[name="email"]');
+                    const pwd = document.querySelector('input[name="password"]');
+                    return email?.offsetParent && pwd?.offsetParent;
+                }, { timeout: 30000 });
 
-                await page.waitForFunction(() => document.readyState === "complete", { timeout: 20000 });
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Page de connexion chargée. URL: ${page.url()}`);
+                // Remplissage sécurisé
+                await page.evaluate((email, pwd) => {
+                    const emailField = document.querySelector('input[name="email"]');
+                    const pwdField = document.querySelector('input[name="password"]');
+                    if (emailField) emailField.value = email;
+                    if (pwdField) pwdField.value = pwd;
+                }, process.env.GAML_EMAIL, process.env.GAML_PASSWORD);
 
-                await page.waitForSelector('input[name="email"]', { timeout: 30000 });
-                await page.waitForSelector('input[name="password"]', { timeout: 30000 });
+                await humanDelay(1000);
 
-                await page.click('input[name="email"]', { clickCount: 3 });
-                await page.keyboard.press('Backspace');
-                await humanDelay(300);
-
-                await page.type('input[name="email"]', process.env.GAML_EMAIL, {
-                    delay: 20 + Math.random() * 50
-                });
-
-                await humanDelay(500 + Math.random() * 500);
-
-                await page.type('input[name="password"]', process.env.GAML_PASSWORD, {
-                    delay: 20 + Math.random() * 50
-                });
-
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Identifiants saisis.`);
-                await humanDelay(2000);
-
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Soumission du formulaire...`);
+                // Soumission
                 await Promise.all([
-                    page.keyboard.press('Enter'),
-                    page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 90000 })
+                    page.click('button[type="submit"], input[type="submit"]'),
+                    page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 90000 })
                 ]);
 
-                const currentUrl = page.url();
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] URL après soumission: ${currentUrl}`);
-                await humanDelay(3000);
-
-                if (currentUrl.includes('/account') || currentUrl.includes('/dashboard')) {
+                // Vérification
+                if (page.url().includes('/account') || page.url().includes('/dashboard')) {
                     loginSuccess = true;
-                    console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ✅ Connexion réussie !`);
                     break;
-                } else {
-                    console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ⚠️ Redirection incorrecte. URL actuelle: ${currentUrl}`);
-
-                    const errorMessage = await page.evaluate(() => {
-                        const alertDiv = document.querySelector('.alert.alert-danger');
-                        if (alertDiv) return alertDiv.innerText.trim();
-                        const formError = document.querySelector('.error-message');
-                        if (formError) return formError.innerText.trim();
-                        return null;
-                    });
-
-                    if (errorMessage) {
-                        console.error(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Message d'erreur détecté : "${errorMessage}"`);
-                        throw new Error(`Login échoué: ${errorMessage}`);
-                    } else {
-                        console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Aucun message d'erreur explicite. Possiblement un captcha ou blocage.`);
-                    }
                 }
 
             } catch (error) {
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ⚠️ Tentative ${attempt} échouée:`, error.message);
-                if (browser && browser.isConnected()) {
-                    if (!error.message.includes('TimeoutError') && !error.message.includes('net::ERR_')) {
-                        await page.reload({ waitUntil: 'domcontentloaded' }).catch(e => console.log("Erreur lors du rechargement:", e.message));
-                    }
-                }
-                await humanDelay(5000);
+                console.log(`Échec tentative ${attempt}:`, error.message);
+                await page.screenshot({ path: `/tmp/error-attempt-${attempt}.png` });
+                if (attempt < 3) await page.reload();
             }
         }
 
-        if (!loginSuccess) {
-            throw new Error('Échec de la connexion après 3 tentatives. Vérifiez vos identifiants ou le comportement du site.');
-        }
-
-        console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ✅ Fin de la fonction login.`);
+        if (!loginSuccess) throw new Error('Connexion échouée après 3 tentatives');
+        
+        console.log('✅ Connexion réussie !');
         return { browser, page };
 
     } catch (error) {
-        console.error(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ❌ Erreur critique:`, error.message);
-        if (browser && browser.isConnected()) {
-            await browser.close();
-            console.log("Navigateur fermé après erreur critique.");
-        }
-        throw new Error(`Échec final dans login: ${error.message}`);
+        console.error('❌ Erreur critique:', error);
+        if (browser) await browser.close();
+        throw error;
     }
 }
 
