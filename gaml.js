@@ -18,7 +18,6 @@ async function login() {
     const startTime = Date.now();
     console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Début de la connexion dans la fonction login...`);
 
-    // Debug : affichage du chemin de Chromium
     const resolvedExecutablePath = puppeteer.executablePath();
     if (resolvedExecutablePath) {
         console.log('✅ Chemin Chromium Puppeteer résolu automatiquement :', resolvedExecutablePath);
@@ -57,13 +56,8 @@ async function login() {
             process.env.USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
         );
 
-        try {
-            await page.goto('https://getallmylinks.com', { waitUntil: 'domcontentloaded', timeout: 90000 });
-            console.log('✅ Test de navigation réussi : getallmylinks.com chargée.');
-        } catch (e) {
-            console.error('❌ Test de navigation échoué lors du goto initial:', e.message);
-            throw e;
-        }
+        await page.goto('https://getallmylinks.com', { waitUntil: 'domcontentloaded', timeout: 90000 });
+        console.log('✅ Test de navigation réussi : getallmylinks.com chargée.');
 
         const loginUrl = 'https://getallmylinks.com/login';
         let loginSuccess = false;
@@ -72,15 +66,13 @@ async function login() {
             try {
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] 🔒 Tentative de connexion #${attempt}`);
 
-                await Promise.all([
-                    page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60000 }),
-                    page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 60000 })
-                ]);
+                await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
+                await page.waitForFunction(() => document.readyState === "complete", { timeout: 20000 });
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Page de connexion chargée. URL: ${page.url()}`);
 
-                await page.waitForSelector('input[name="email"]', { timeout: 45000, visible: true });
-                await page.waitForSelector('input[name="password"]', { timeout: 45000, visible: true });
+                await page.waitForSelector('input[name="email"]', { timeout: 30000 });
+                await page.waitForSelector('input[name="password"]', { timeout: 30000 });
 
                 await page.click('input[name="email"]', { clickCount: 3 });
                 await page.keyboard.press('Backspace');
