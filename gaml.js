@@ -18,21 +18,15 @@ async function login() {
     const startTime = Date.now();
     console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Début de la connexion dans la fonction login...`);
 
-    // **IMPORTANT** : retire la ligne 'executablePath = /opt/render/.cache/...'
-    // Puppeteer doit maintenant trouver le chemin automatiquement via PUPPETEER_EXECUTABLE_PATH
-    // défini dans le Dockerfile. Si tu vois toujours ce log, c'est que quelque chose ne va pas
-    // avec la variable d'environnement ou le Dockerfile.
-    const executablePath = puppeteer.executablePath();
-    if (!executablePath) {
-        // Cette erreur devrait maintenant se déclencher si le Dockerfile/PUPPETEER_EXECUTABLE_PATH
-        // ne configure pas correctement Puppeteer.
-        throw new Error('❌ Erreur: Puppeteer n\'a pas trouvé le chemin de l\'exécutable Chrome. Vérifiez le Dockerfile et la variable d\'environnement PUPPETEER_EXECUTABLE_PATH.');
+    // Debug : affichage du chemin de Chromium
+    const resolvedExecutablePath = puppeteer.executablePath();
+    if (resolvedExecutablePath) {
+        console.log('✅ Chemin Chromium Puppeteer résolu automatiquement :', resolvedExecutablePath);
+    } else {
+        console.warn('⚠️ Aucun chemin résolu pour Puppeteer. Assurez-vous que PUPPETEER_EXECUTABLE_PATH est bien défini.');
     }
 
-    console.log('Chemin Chromium Puppeteer:', executablePath);
-
     const launchOptions = {
-        executablePath,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -55,15 +49,13 @@ async function login() {
 
     try {
         browser = await puppeteer.launch(launchOptions);
-        const version = await browser.version();
-        console.log('Version Chrome:', version);
-
+        console.log('Version Chrome:', await browser.version());
         console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Navigateur lancé`);
 
         page = await browser.newPage();
-
-        // Utilisation d'une variable d'environnement pour l'User-Agent, sinon un User-Agent par défaut.
-        await page.setUserAgent(process.env.USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
+        await page.setUserAgent(
+            process.env.USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
+        );
 
         try {
             await page.goto('https://getallmylinks.com', { waitUntil: 'domcontentloaded', timeout: 90000 });
@@ -80,7 +72,6 @@ async function login() {
             try {
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] 🔒 Tentative de connexion #${attempt}`);
 
-                // Assurer d'être sur la page de login, en attendant la fin du chargement du DOM.
                 await Promise.all([
                     page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60000 }),
                     page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 60000 })
@@ -88,92 +79,79 @@ async function login() {
 
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Page de connexion chargée. URL: ${page.url()}`);
 
-                // Attendre que les champs email et password soient bien présents et visibles, avec un timeout généreux.
                 await page.waitForSelector('input[name="email"]', { timeout: 45000, visible: true });
                 await page.waitForSelector('input[name="password"]', { timeout: 45000, visible: true });
 
-                // Vider les champs avant de taper pour éviter d'ajouter à du texte existant.
                 await page.click('input[name="email"]', { clickCount: 3 });
                 await page.keyboard.press('Backspace');
-                await humanDelay(300); // Délai après effacement
+                await humanDelay(300);
 
                 await page.type('input[name="email"]', process.env.GAML_EMAIL, {
                     delay: 20 + Math.random() * 50
                 });
 
-                await humanDelay(500 + Math.random() * 500); // Délai plus variable
+                await humanDelay(500 + Math.random() * 500);
 
                 await page.type('input[name="password"]', process.env.GAML_PASSWORD, {
                     delay: 20 + Math.random() * 50
                 });
 
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Identifiants saisis.`);
-                await humanDelay(2000); // Délai plus long après saisie, avant soumission.
+                await humanDelay(2000);
 
-                // Soumettre le formulaire en appuyant sur 'Entrée' après le champ password, c'est souvent plus robuste.
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Soumission du formulaire par touche Entrée...`);
+                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Soumission du formulaire...`);
                 await Promise.all([
-                    page.keyboard.press('Enter'), // Simule la touche Entrée pour soumettre le formulaire
-                    // Attendre la navigation après la soumission, en utilisant domcontentloaded et un timeout de 90s.
+                    page.keyboard.press('Enter'),
                     page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 90000 })
                 ]);
 
                 const currentUrl = page.url();
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] URL après soumission: ${currentUrl}`);
-                await humanDelay(3000); // Délai après redirection pour s'assurer que la page est stable.
+                await humanDelay(3000);
 
-                // Vérifier si la redirection a réussi vers le compte ou le tableau de bord.
                 if (currentUrl.includes('/account') || currentUrl.includes('/dashboard')) {
                     loginSuccess = true;
                     console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ✅ Connexion réussie !`);
                     break;
                 } else {
-                    console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ⚠️ Redirection incorrecte après login. URL actuelle: ${currentUrl}`);
+                    console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ⚠️ Redirection incorrecte. URL actuelle: ${currentUrl}`);
 
-                    // Tenter de lire les messages d'erreur courants sur la page (si le login échoue).
                     const errorMessage = await page.evaluate(() => {
-                        // Chercher des éléments d'alerte, de message d'erreur ou de texte indiquant un échec de login.
-                        const alertDiv = document.querySelector('.alert.alert-danger'); // Exemple courant
+                        const alertDiv = document.querySelector('.alert.alert-danger');
                         if (alertDiv) return alertDiv.innerText.trim();
-
-                        const formError = document.querySelector('.error-message'); // Autre exemple
+                        const formError = document.querySelector('.error-message');
                         if (formError) return formError.innerText.trim();
-
-                        // Ajoutez d'autres sélecteurs spécifiques à getallmylinks.com si tu en trouves en inspectant la page de login en cas d'erreur.
-                        
-                        return null; // Si aucun message d'erreur explicite n'est trouvé.
+                        return null;
                     });
 
                     if (errorMessage) {
-                        console.error(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Message d'erreur détecté sur la page: "${errorMessage}"`);
+                        console.error(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Message d'erreur détecté : "${errorMessage}"`);
                         throw new Error(`Login échoué: ${errorMessage}`);
                     } else {
-                        console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Aucun message d'erreur explicite détecté, mais pas de redirection. Le site est peut-être bloqué ou a un captcha.`);
+                        console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Aucun message d'erreur explicite. Possiblement un captcha ou blocage.`);
                     }
                 }
 
             } catch (error) {
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ⚠️ Tentative ${attempt} échouée:`, error.message);
                 if (browser && browser.isConnected()) {
-                    // Tente de recharger la page si l'erreur n'est pas un timeout de goto/waitForNavigation sur la page de login elle-même
-                    // ou un problème réseau général.
                     if (!error.message.includes('TimeoutError') && !error.message.includes('net::ERR_')) {
-                        await page.reload({ waitUntil: 'domcontentloaded' }).catch(e => console.log("Erreur lors du rechargement de la page de login:", e.message));
+                        await page.reload({ waitUntil: 'domcontentloaded' }).catch(e => console.log("Erreur lors du rechargement:", e.message));
                     }
                 }
-                await humanDelay(5000); // Délai plus long avant la prochaine tentative en cas d'erreur.
+                await humanDelay(5000);
             }
         }
 
         if (!loginSuccess) {
-            throw new Error('Échec de la connexion après 3 tentatives. Vérifiez vos identifiants ou le comportement du site web.');
+            throw new Error('Échec de la connexion après 3 tentatives. Vérifiez vos identifiants ou le comportement du site.');
         }
 
         console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ✅ Fin de la fonction login.`);
         return { browser, page };
 
     } catch (error) {
-        console.error(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ❌ Erreur critique dans login:`, error.message);
+        console.error(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ❌ Erreur critique:`, error.message);
         if (browser && browser.isConnected()) {
             await browser.close();
             console.log("Navigateur fermé après erreur critique.");
@@ -181,6 +159,7 @@ async function login() {
         throw new Error(`Échec final dans login: ${error.message}`);
     }
 }
+
 
 // Encapsulation avec timeout global
 async function safeLoginWithTimeout() {
