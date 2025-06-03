@@ -74,7 +74,7 @@ async function login() {
                 await page.waitForFunction(() => {
                   const emailInput = document.querySelector('input[name="email"]');
                   return emailInput && emailInput.offsetParent !== null && !emailInput.disabled;
-                }, { timeout: 30000 });
+                }, { timeout: 90000 });
                 await page.waitForSelector('input[name="password"]', { timeout: 90000 });
 
                 await page.click('input[name="email"]', { clickCount: 3 });
