@@ -66,16 +66,16 @@ async function login() {
             try {
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] 🔒 Tentative de connexion #${attempt}`);
 
-                await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+                await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
 
-                await page.waitForFunction(() => document.readyState === "complete", { timeout: 20000 });
+                await page.waitForFunction(() => document.readyState === "complete", { timeout: 90000 });
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Page de connexion chargée. URL: ${page.url()}`);
 
                 await page.waitForFunction(() => {
                   const emailInput = document.querySelector('input[name="email"]');
                   return emailInput && emailInput.offsetParent !== null && !emailInput.disabled;
                 }, { timeout: 30000 });
-                await page.waitForSelector('input[name="password"]', { timeout: 30000 });
+                await page.waitForSelector('input[name="password"]', { timeout: 90000 });
 
                 await page.click('input[name="email"]', { clickCount: 3 });
                 await page.keyboard.press('Backspace');
