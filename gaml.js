@@ -31,11 +31,11 @@ async function login() {
     }
 
     const launchOptions = {
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath(),
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
+            '--disable-blink-features=AutomationControlled',
             '--disable-gpu',
             '--disable-infobars',
             '--window-size=1280,720',
