@@ -67,6 +67,8 @@ async function login() {
         const loginUrl = 'https://getallmylinks.com/login';
         let loginSuccess = false;
 
+        await page.waitForTimeout(5000); // Ajoute un délai de 5 secondes avant la recherche
+
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
                 timeLog(`🔒 Tentative de connexion #${attempt}`);
@@ -76,18 +78,12 @@ async function login() {
                 timeLog(`Page de connexion chargée. URL: ${page.url()}`);
 
                 const debugInfo = await page.evaluate(() => {
-                    const emailInput = document.querySelector('input[name="email"]');
-                    const passwordInput = document.querySelector('input[name="password"]');
-                    const recaptchaIframe = document.querySelector('iframe[src*="recaptcha"]');
-                    const captchaDiv = document.querySelector('.g-recaptcha, #recaptcha');
                     return {
-                        emailInputExists: !!emailInput,
-                        passwordInputExists: !!passwordInput,
-                        recaptchaIframeExists: !!recaptchaIframe,
-                        captchaDivExists: !!captchaDiv,
+                        emailField: document.querySelector('input[name="email"]'),
+                        passwordField: document.querySelector('input[name="password"]'),
+                        captcha: document.querySelector('iframe[src*="recaptcha"]') || document.querySelector('.g-recaptcha, #recaptcha')
                     };
                 });
-
                 console.log('DEBUG INFO:', debugInfo);
 
                 if (!debugInfo.emailInputExists || !debugInfo.passwordInputExists) {
