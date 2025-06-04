@@ -37,7 +37,7 @@ async function login() {
             '--disable-infobars',
             '--window-size=1280,720'
         ],
-        headless: false,
+        headless: true,
         executablePath: resolvedExecutablePath,
         ignoreHTTPSErrors: true,
         defaultViewport: null
