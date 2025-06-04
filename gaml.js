@@ -72,6 +72,33 @@ async function login() {
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Page de connexion chargée. URL: ${page.url()}`);
 
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Attente du champ email...`);
+
+                const debugInfo = await page.evaluate(() => {
+                    const emailInput = document.querySelector('input[name="email"]');
+                    const passwordInput = document.querySelector('input[name="password"]');
+                    const recaptchaIframe = document.querySelector('iframe[src*="recaptcha"]');
+                    const captchaDiv = document.querySelector('.g-recaptcha, #recaptcha'); // Sélecteurs courants de reCAPTCHA
+
+                    return {
+                        emailInputExists: !!emailInput,
+                        emailInputVisible: emailInput ? emailInput.offsetParent !== null : false,
+                        emailInputDisabled: emailInput ? emailInput.disabled : false,
+                        emailInputStyle: emailInput ? window.getComputedStyle(emailInput).cssText : null, // Pour voir display, visibility
+                        passwordInputExists: !!passwordInput,
+                        passwordInputVisible: passwordInput ? passwordInput.offsetParent !== null : false,
+                        passwordInputDisabled: passwordInput ? passwordInput.disabled : false,
+                        recaptchaIframeExists: !!recaptchaIframe,
+                        recaptchaIframeVisible: recaptchaIframe ? recaptchaIframe.offsetParent !== null : false,
+                        captchaDivExists: !!captchaDiv,
+                        captchaDivVisible: captchaDiv ? captchaDiv.offsetParent !== null : false,
+                        bodyOverflow: document.body.style.overflow, // Si un overlay masque la page
+                        anyModalOverlay: !!document.querySelector('.modal, .overlay, .popup, [role="dialog"] [aria-modal="true"]')
+                    };
+                });
+
+                console.log('DEBUG INFO (sur page de login):', debugInfo);
+
+                // Puis, seulement après avoir loggé les infos :
                 await page.waitForSelector('input[name="email"]', { timeout: 90000, visible: true }); // Attendre qu'il soit visible
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Champ email trouvé.`);
 
