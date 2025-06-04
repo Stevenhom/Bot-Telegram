@@ -16,16 +16,22 @@ const IS_RENDER = process.env.RENDER === 'true';
 
 async function login() {
     const startTime = Date.now();
-    console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Début de la connexion dans la fonction login...`);
+    const timeLog = (msg) => {
+        const delta = ((Date.now() - startTime) / 1000).toFixed(3);
+        console.log(`[${delta}s] ${msg}`);
+    };
 
-    const resolvedExecutablePath = puppeteer.executablePath();
+    timeLog("Début de la connexion dans la fonction login...");
+
+    let resolvedExecutablePath = process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath();
     if (resolvedExecutablePath) {
-        console.log('✅ Chemin Chromium Puppeteer résolu automatiquement :', resolvedExecutablePath);
+        console.log('✅ Chemin Chromium Puppeteer utilisé :', resolvedExecutablePath);
     } else {
-        console.warn('⚠️ Aucun chemin résolu pour Puppeteer. Assurez-vous que PUPPETEER_EXECUTABLE_PATH est bien défini.');
+        console.warn('⚠️ Aucun chemin résolu pour Puppeteer. Assurez-vous que PUPPETEER_EXECUTABLE_PATH est défini ou Puppeteer bien installé.');
     }
 
     const launchOptions = {
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath(),
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -39,17 +45,16 @@ async function login() {
             '--disable-renderer-backgrounding'
         ],
         headless: 'new',
+        executablePath: resolvedExecutablePath,
         ignoreHTTPSErrors: true,
         defaultViewport: null
     };
 
-    let browser;
-    let page;
+    let browser, page;
 
     try {
         browser = await puppeteer.launch(launchOptions);
-        console.log('Version Chrome:', await browser.version());
-        console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Navigateur lancé`);
+        timeLog(`Navigateur lancé : ${await browser.version()}`);
 
         page = await browser.newPage();
         await page.setUserAgent(
@@ -57,64 +62,52 @@ async function login() {
         );
 
         await page.goto('https://getallmylinks.com', { waitUntil: 'networkidle2', timeout: 90000 });
-        console.log('✅ Test de navigation réussi : getallmylinks.com chargée.');
+        console.log('✅ Page d’accueil chargée avec succès.');
 
         const loginUrl = 'https://getallmylinks.com/login';
         let loginSuccess = false;
 
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] 🔒 Tentative de connexion #${attempt}`);
+                timeLog(`🔒 Tentative de connexion #${attempt}`);
                 await page.goto(loginUrl, { waitUntil: 'networkidle2', timeout: 90000 });
 
                 await page.waitForFunction(() => document.readyState === "complete", { timeout: 90000 });
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Page de connexion chargée. URL: ${page.url()}`);
-
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Attente du champ email...`);
+                timeLog(`Page de connexion chargée. URL: ${page.url()}`);
 
                 const debugInfo = await page.evaluate(() => {
                     const emailInput = document.querySelector('input[name="email"]');
                     const passwordInput = document.querySelector('input[name="password"]');
                     const recaptchaIframe = document.querySelector('iframe[src*="recaptcha"]');
                     const captchaDiv = document.querySelector('.g-recaptcha, #recaptcha');
-
                     return {
                         emailInputExists: !!emailInput,
-                        emailInputVisible: emailInput ? emailInput.offsetParent !== null : false,
-                        emailInputDisabled: emailInput ? emailInput.disabled : false,
-                        emailInputStyle: emailInput ? window.getComputedStyle(emailInput).cssText : null,
                         passwordInputExists: !!passwordInput,
-                        passwordInputVisible: passwordInput ? passwordInput.offsetParent !== null : false,
-                        passwordInputDisabled: passwordInput ? passwordInput.disabled : false,
                         recaptchaIframeExists: !!recaptchaIframe,
-                        recaptchaIframeVisible: recaptchaIframe ? recaptchaIframe.offsetParent !== null : false,
                         captchaDivExists: !!captchaDiv,
-                        captchaDivVisible: captchaDiv ? captchaDiv.offsetParent !== null : false,
-                        bodyOverflow: document.body.style.overflow,
-                        anyModalOverlay: !!document.querySelector('.modal, .overlay, .popup, [role="dialog"] [aria-modal="true"]')
                     };
                 });
 
-                console.log('DEBUG INFO (sur page de login):', debugInfo);
+                console.log('DEBUG INFO:', debugInfo);
+
+                if (!debugInfo.emailInputExists || !debugInfo.passwordInputExists) {
+                    throw new Error("Champs email ou mot de passe non trouvés sur la page.");
+                }
 
                 await page.waitForSelector('input[name="email"]', { timeout: 90000, visible: true });
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Champ email trouvé.`);
-
                 await page.waitForSelector('input[name="password"]', { timeout: 90000, visible: true });
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Champ mot de passe trouvé.`);
 
                 await page.click('input[name="email"]', { clickCount: 3 });
                 await page.keyboard.press('Backspace');
                 await humanDelay(300);
-
                 await page.type('input[name="email"]', process.env.GAML_EMAIL, { delay: 20 + Math.random() * 50 });
-                await humanDelay(500 + Math.random() * 500);
 
+                await humanDelay(300);
                 await page.type('input[name="password"]', process.env.GAML_PASSWORD, { delay: 20 + Math.random() * 50 });
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Identifiants saisis.`);
+
+                timeLog('Identifiants saisis. Soumission du formulaire...');
 
                 await humanDelay(2000);
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Soumission du formulaire...`);
 
                 await Promise.all([
                     page.keyboard.press('Enter'),
@@ -122,36 +115,33 @@ async function login() {
                 ]);
 
                 const currentUrl = page.url();
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] URL après soumission: ${currentUrl}`);
-                await humanDelay(3000);
+                timeLog(`URL après soumission: ${currentUrl}`);
 
                 if (currentUrl.includes('/account') || currentUrl.includes('/dashboard')) {
                     loginSuccess = true;
-                    console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ✅ Connexion réussie !`);
+                    timeLog('✅ Connexion réussie !');
                     break;
                 } else {
-                    console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ⚠️ Redirection incorrecte. URL actuelle: ${currentUrl}`);
-
                     const errorMessage = await page.evaluate(() => {
-                        const alertDiv = document.querySelector('.alert.alert-danger');
-                        if (alertDiv) return alertDiv.innerText.trim();
-                        const formError = document.querySelector('.error-message');
-                        if (formError) return formError.innerText.trim();
-                        return null;
+                        const alert = document.querySelector('.alert.alert-danger') || document.querySelector('.error-message');
+                        return alert ? alert.innerText.trim() : null;
                     });
 
                     if (errorMessage) {
-                        console.error(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Message d'erreur détecté : "${errorMessage}"`);
+                        console.error(`❌ Message d'erreur détecté : "${errorMessage}"`);
                         throw new Error(`Login échoué: ${errorMessage}`);
                     } else {
-                        console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Aucun message d'erreur explicite. Possiblement un captcha ou blocage.`);
+                        console.warn(`⚠️ Aucun message d'erreur visible. CAPTCHA ou autre blocage possible.`);
                     }
                 }
-            } catch (error) {
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ⚠️ Tentative ${attempt} échouée:`, error.message);
+
+            } catch (err) {
+                console.error(`❌ Tentative ${attempt} échouée:`, err.message);
                 if (browser && browser.isConnected()) {
-                    if (!error.message.includes('TimeoutError') && !error.message.includes('net::ERR_')) {
-                        await page.reload({ waitUntil: 'domcontentloaded' }).catch(e => console.log("Erreur lors du rechargement:", e.message));
+                    try {
+                        await page.reload({ waitUntil: 'domcontentloaded' });
+                    } catch (reloadErr) {
+                        console.warn("Erreur de rechargement de page :", reloadErr.message);
                     }
                 }
                 await humanDelay(5000);
@@ -159,22 +149,21 @@ async function login() {
         }
 
         if (!loginSuccess) {
-            throw new Error('Échec de la connexion après 3 tentatives. Vérifiez vos identifiants ou le comportement du site.');
+            throw new Error('Échec de la connexion après 3 tentatives. Vérifiez les identifiants, captchas ou erreurs du site.');
         }
 
-        console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ✅ Fin de la fonction login.`);
+        timeLog('✅ Fin de la fonction login.');
         return { browser, page };
 
     } catch (error) {
-        console.error(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ❌ Erreur critique:`, error.message);
+        console.error(`❌ Erreur critique: ${error.message}`);
         if (browser && browser.isConnected()) {
             await browser.close();
-            console.log("Navigateur fermé après erreur critique.");
+            console.log("Navigateur fermé proprement après échec.");
         }
         throw new Error(`Échec final dans login: ${error.message}`);
     }
 }
-
 
 // Encapsulation avec timeout global
 async function safeLoginWithTimeout() {
