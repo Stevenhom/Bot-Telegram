@@ -56,7 +56,7 @@ async function login() {
             process.env.USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
         );
 
-        await page.goto('https://getallmylinks.com', { waitUntil: 'domcontentloaded', timeout: 90000 });
+        await page.goto('https://getallmylinks.com', { waitUntil: 'networkidle2', timeout: 90000 });
         console.log('✅ Test de navigation réussi : getallmylinks.com chargée.');
 
         const loginUrl = 'https://getallmylinks.com/login';
@@ -66,7 +66,7 @@ async function login() {
             try {
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] 🔒 Tentative de connexion #${attempt}`);
 
-                await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
+                await page.goto(loginUrl, { waitUntil: 'networkidle2', timeout: 90000 });
 
                 await page.waitForFunction(() => document.readyState === "complete", { timeout: 90000 });
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Page de connexion chargée. URL: ${page.url()}`);
@@ -97,7 +97,7 @@ async function login() {
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Soumission du formulaire...`);
                 await Promise.all([
                     page.keyboard.press('Enter'),
-                    page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 90000 })
+                    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 90000 })
                 ]);
 
                 const currentUrl = page.url();
