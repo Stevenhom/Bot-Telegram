@@ -24,7 +24,7 @@ async function login() {
 
     timeLog("🔑 Début de la connexion dans la fonction login...");
 
-    let resolvedExecutablePath = process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath();
+    const resolvedExecutablePath = process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath();
     console.log(resolvedExecutablePath ? `✅ Chemin Chromium utilisé: ${resolvedExecutablePath}` : `⚠️ Aucun chemin Chromium défini !`);
 
     const launchOptions = {
@@ -53,93 +53,67 @@ async function login() {
         const context = await browser.createBrowserContext();
         page = await context.newPage();
 
-        await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-
+        // Désactive les détections automatisées (bot)
         await page.evaluateOnNewDocument(() => {
-            Object.defineProperty(navigator, 'webdriver', { get: () => false });
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => false,
+            });
+            Object.defineProperty(navigator, 'languages', {
+                get: () => ['fr-FR', 'fr'],
+            });
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [1, 2, 3],
+            });
         });
 
-        // 📌 Charger les cookies enregistrés
-        try {
-            if (fs.existsSync('cookies.json')) {
-                const cookies = JSON.parse(fs.readFileSync('cookies.json', 'utf8'));
-                await page.setCookie(...cookies);
-                console.log("🍪 Cookies chargés !");
-            } else {
-                console.warn("⚠️ Aucun cookie enregistré, connexion normale.");
-            }
-        } catch (err) {
-            console.error("⚠️ Erreur lors du chargement des cookies :", err);
+        // Log des erreurs JS de la page
+        page.on('console', (msg) => {
+            if (msg.type() === 'error') console.error('🚨 Console error:', msg.text());
+        });
+
+        // Optionnel : User-Agent plus réaliste
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36');
+
+        // Aller à la page de connexion
+        await page.goto('https://getallmylinks.com/login', { waitUntil: 'networkidle2' });
+        timeLog("✅ Page de connexion chargée.");
+
+        // Vérifie les sélecteurs du formulaire
+        const emailSelector = 'input[type="email"]';
+        const passwordSelector = 'input[type="password"]';
+        const submitSelector = 'button[type="submit"]';
+
+        const emailExists = await page.$(emailSelector);
+        const passwordExists = await page.$(passwordSelector);
+        const submitExists = await page.$(submitSelector);
+
+        if (!emailExists || !passwordExists || !submitExists) {
+            throw new Error("❌ Champs email/mot de passe/bouton non trouvés.");
         }
 
-        await page.goto('https://getallmylinks.com', { waitUntil: 'networkidle2', timeout: 90000 });
-        console.log('✅ Page d’accueil chargée avec succès.');
+        // Remplit le formulaire
+        await page.type(emailSelector, process.env.USER_EMAIL, { delay: 50 });
+        await page.type(passwordSelector, process.env.USER_PASSWORD, { delay: 50 });
 
-        // 📌 Vérifier si le CAPTCHA est encore présent après chargement des cookies
-        const captchaDetected = await page.evaluate(() => {
-            return document.querySelector('iframe[src*="recaptcha"]') || document.querySelector('.g-recaptcha, #recaptcha');
-        });
-        console.log(`🔎 CAPTCHA après chargement des cookies : ${captchaDetected ? "⚠️ Oui" : "✅ Non"}`);
+        // Capture de l'état avant soumission
+        await page.screenshot({ path: 'before-submit.png' });
+        timeLog("📸 Screenshot enregistré : before-submit.png");
 
-        if (captchaDetected) {
-            console.warn("🚨 CAPTCHA détecté. Résous-le manuellement dans le navigateur.");
-            await new Promise(resolve => setTimeout(resolve, 60000));
+        // Soumettre
+        await page.click(submitSelector);
+        timeLog("🛠️ Formulaire soumis.");
 
-            // 📌 Sauvegarder les cookies après validation
-            const cookies = await page.cookies();
-            fs.writeFileSync('cookies.json', JSON.stringify(cookies, null, 2));
-            console.log("✅ Cookies enregistrés !");
-        }
+        // Attendre redirection ou confirmation
+        await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 10000 });
+        timeLog("✅ Connexion réussie (probable).");
 
-        const loginUrl = 'https://getallmylinks.com/login';
-        await page.goto(loginUrl, { waitUntil: 'networkidle2', timeout: 90000 });
+        // ... continuation éventuelle (cookies, confirmation, etc.)
 
-        await page.waitForSelector('input#email', { timeout: 90000, visible: true });
-        await page.waitForSelector('input#password', { timeout: 90000, visible: true });
-
-        await page.type('input#email', process.env.GAML_EMAIL, { delay: 20 });
-        await page.type('input#password', process.env.GAML_PASSWORD, { delay: 20 });
-
-        timeLog('🛠️ Identifiants saisis, soumission...');
-
-        // 📌 Capture les requêtes HTTP après soumission
-        page.on('request', request => {
-            console.log(`🛠️ Requête envoyée : ${request.url()} | Méthode : ${request.method()}`);
-        });
-        page.on('response', response => {
-            console.log(`📌 Réponse reçue : ${response.url()} | Status : ${response.status()}`);
-        });
-
-        // 📌 Alternative : soumettre directement via JavaScript
-        await page.evaluate(() => {
-            document.querySelector('form')?.submit();
-        });
-
-        await Promise.race([
-            page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }),
-            new Promise(resolve => setTimeout(resolve, 30000))
-        ]);
-
-        const currentUrl = page.url();
-        console.log("📌 URL après soumission :", currentUrl);
-
-        // 📌 Vérifier les erreurs affichées sur la page après soumission
-        const errorMessage = await page.evaluate(() => {
-            return document.querySelector('.alert.alert-danger')?.innerText || document.querySelector('.error-message')?.innerText;
-        });
-        console.log("❌ Message d'erreur détecté :", errorMessage || "Aucun message trouvé.");
-
-        if (currentUrl.includes('/account') || currentUrl.includes('/dashboard')) {
-            timeLog('✅ Connexion réussie !');
-        } else {
-            throw new Error(`⚠️ Login échoué, possible CAPTCHA ou blocage Cloudflare... | Erreur détectée : ${errorMessage || "Pas de message"}`);
-        }
-
-        return { browser, page };
-    } catch (error) {
-        console.error(`❌ Erreur critique : ${error.message}`);
-        if (browser && browser.isConnected()) await browser.close();
-        throw new Error(`🚨 Échec final dans login: ${error.message}`);
+        await browser.close();
+        timeLog("🧹 Navigateur fermé.");
+    } catch (err) {
+        console.error("❌ Erreur :", err.message);
+        if (browser) await browser.close();
     }
 }
 
