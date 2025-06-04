@@ -2,7 +2,6 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteer.use(StealthPlugin());
-const fs = require('fs');
 
 const pTimeout = require('p-timeout');
 
@@ -38,7 +37,7 @@ async function login() {
             '--disable-infobars',
             '--window-size=1280,720'
         ],
-        headless: false, // Désactiver le headless pour la première validation manuelle
+        headless: false,
         executablePath: resolvedExecutablePath,
         ignoreHTTPSErrors: true,
         defaultViewport: null
@@ -53,27 +52,24 @@ async function login() {
         page = await browser.newPage();
         await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
 
+        // Supprimer les traces de Puppeteer
         await page.evaluateOnNewDocument(() => {
             Object.defineProperty(navigator, 'webdriver', { get: () => false });
         });
 
-        // 📌 Charger les cookies enregistrés
         try {
-            if (fs.existsSync('cookies.json')) {
-                const cookies = JSON.parse(fs.readFileSync('cookies.json', 'utf8'));
-                await page.setCookie(...cookies);
-                console.log("🍪 Cookies chargés !");
-            } else {
-                console.warn("⚠️ Aucun cookie enregistré, connexion normale.");
-            }
+            const cookies = JSON.parse(fs.readFileSync('cookies.json', 'utf8'));
+            await page.setCookie(...cookies);
+            console.log("🍪 Cookies chargés !");
         } catch (err) {
-            console.error("⚠️ Erreur lors du chargement des cookies :", err);
+            console.warn("⚠️ Aucun cookie enregistré, connexion normale.");
         }
+
 
         await page.goto('https://getallmylinks.com', { waitUntil: 'networkidle2', timeout: 90000 });
         console.log('✅ Page d’accueil chargée avec succès.');
 
-        // 📌 Vérifier si le CAPTCHA est encore actif
+         // 📌 Vérifier si le CAPTCHA bloque encore
         const captchaDetected = await page.evaluate(() => {
             return document.querySelector('iframe[src*="recaptcha"]') || document.querySelector('.g-recaptcha, #recaptcha');
         });
@@ -90,29 +86,67 @@ async function login() {
         }
 
         const loginUrl = 'https://getallmylinks.com/login';
-        await page.goto(loginUrl, { waitUntil: 'networkidle2', timeout: 90000 });
+        let loginSuccess = false;
 
-        await page.waitForSelector('input#email', { timeout: 90000, visible: true });
-        await page.waitForSelector('input#password', { timeout: 90000, visible: true });
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                timeLog(`🔒 Tentative de connexion #${attempt}`);
+                await page.goto(loginUrl, { waitUntil: 'networkidle2', timeout: 90000 });
 
-        await page.type('input#email', process.env.GAML_EMAIL, { delay: 20 });
-        await page.type('input#password', process.env.GAML_PASSWORD, { delay: 20 });
+                // Vérification du CAPTCHA
+                const captchaDetected = await page.evaluate(() => {
+                    return document.querySelector('iframe[src*="recaptcha"]') || document.querySelector('.g-recaptcha, #recaptcha');
+                });
+                console.log(`🔎 Présence d'un CAPTCHA : ${captchaDetected ? "⚠️ Oui" : "✅ Non"}`);
 
-        timeLog('🛠️ Identifiants saisis, soumission...');
-        await page.click('button[type="submit"]');
+                if (captchaDetected) {
+                    throw new Error("🚨 CAPTCHA détecté, connexion bloquée !");
+                }
 
-        await Promise.race([
-            page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }),
-            new Promise(resolve => setTimeout(resolve, 30000))
-        ]);
+                const solver = new (require('2captcha'))(process.env.TWO_CAPTCHA_API_KEY);
+                const response = await solver.recaptchaV2('https://getallmylinks.com/login');
+                await page.evaluate(`document.querySelector('#g-recaptcha-response').innerHTML="${response}";`);
 
-        const currentUrl = page.url();
-        console.log("📌 URL après soumission :", currentUrl);
+                // Détection des champs email et mot de passe
+                await page.waitForSelector('input#email', { timeout: 90000, visible: true });
+                await page.waitForSelector('input#password', { timeout: 90000, visible: true });
 
-        if (currentUrl.includes('/account') || currentUrl.includes('/dashboard')) {
-            timeLog('✅ Connexion réussie !');
-        } else {
-            throw new Error("⚠️ Login échoué, possible CAPTCHA ou blocage Cloudflare...");
+                await page.type('input#email', process.env.GAML_EMAIL, { delay: 20 });
+                await page.type('input#password', process.env.GAML_PASSWORD, { delay: 20 });
+
+                timeLog('🛠️ Identifiants saisis, soumission...');
+                
+                // Alternative : soumettre via bouton plutôt qu'Enter
+                await page.click('button[type="submit"]');
+
+                // Vérification des réponses HTTP
+                page.on('response', response => {
+                    console.log(`🔎 Réponse reçue : ${response.url()} | Status: ${response.status()}`);
+                });
+
+                await Promise.race([
+                    page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }),
+                    new Promise(resolve => setTimeout(resolve, 30000))
+                ]);
+
+                const currentUrl = page.url();
+                console.log("📌 URL après soumission :", currentUrl);
+
+                if (currentUrl.includes('/account') || currentUrl.includes('/dashboard')) {
+                    loginSuccess = true;
+                    timeLog('✅ Connexion réussie !');
+                    break;
+                } else {
+                    throw new Error("⚠️ Login échoué, possible CAPTCHA ou blocage Cloudflare...");
+                }
+            } catch (err) {
+                console.error(`❌ Tentative ${attempt} échouée :`, err.message);
+                await new Promise(resolve => setTimeout(resolve, 5000));
+            }
+        }
+
+        if (!loginSuccess) {
+            throw new Error('❌ Échec de la connexion après 3 tentatives.');
         }
 
         return { browser, page };
@@ -122,7 +156,6 @@ async function login() {
         throw new Error(`🚨 Échec final dans login: ${error.message}`);
     }
 }
-
 
 // Encapsulation avec timeout global
 async function safeLoginWithTimeout() {
