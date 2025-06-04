@@ -65,7 +65,6 @@ async function login() {
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] 🔒 Tentative de connexion #${attempt}`);
-
                 await page.goto(loginUrl, { waitUntil: 'networkidle2', timeout: 90000 });
 
                 await page.waitForFunction(() => document.readyState === "complete", { timeout: 90000 });
@@ -73,57 +72,50 @@ async function login() {
 
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Attente du champ email...`);
 
-              const debugInfo = await page.evaluate(() => {
-                  const emailInput = document.querySelector('input[name="email"]');
-                  const passwordInput = document.querySelector('input[name="password"]');
-                  const recaptchaIframe = document.querySelector('iframe[src*="recaptcha"]');
-                  const captchaDiv = document.querySelector('.g-recaptcha, #recaptcha'); // Sélecteurs courants de reCAPTCHA
+                const debugInfo = await page.evaluate(() => {
+                    const emailInput = document.querySelector('input[name="email"]');
+                    const passwordInput = document.querySelector('input[name="password"]');
+                    const recaptchaIframe = document.querySelector('iframe[src*="recaptcha"]');
+                    const captchaDiv = document.querySelector('.g-recaptcha, #recaptcha');
 
-                  return {
-                      emailInputExists: !!emailInput,
-                      emailInputVisible: emailInput ? emailInput.offsetParent !== null : false,
-                      emailInputDisabled: emailInput ? emailInput.disabled : false,
-                      emailInputStyle: emailInput ? window.getComputedStyle(emailInput).cssText : null, // Pour voir display, visibility
-                      passwordInputExists: !!passwordInput,
-                      passwordInputVisible: passwordInput ? passwordInput.offsetParent !== null : false,
-                      passwordInputDisabled: passwordInput ? passwordInput.disabled : false,
-                      recaptchaIframeExists: !!recaptchaIframe,
-                      recaptchaIframeVisible: recaptchaIframe ? recaptchaIframe.offsetParent !== null : false,
-                      captchaDivExists: !!captchaDiv,
-                      captchaDivVisible: captchaDiv ? captchaDiv.offsetParent !== null : false,
-                      bodyOverflow: document.body.style.overflow, // Si un overlay masque la page
-                      anyModalOverlay: !!document.querySelector('.modal, .overlay, .popup, [role="dialog"] [aria-modal="true"]')
-                  };
-              });
+                    return {
+                        emailInputExists: !!emailInput,
+                        emailInputVisible: emailInput ? emailInput.offsetParent !== null : false,
+                        emailInputDisabled: emailInput ? emailInput.disabled : false,
+                        emailInputStyle: emailInput ? window.getComputedStyle(emailInput).cssText : null,
+                        passwordInputExists: !!passwordInput,
+                        passwordInputVisible: passwordInput ? passwordInput.offsetParent !== null : false,
+                        passwordInputDisabled: passwordInput ? passwordInput.disabled : false,
+                        recaptchaIframeExists: !!recaptchaIframe,
+                        recaptchaIframeVisible: recaptchaIframe ? recaptchaIframe.offsetParent !== null : false,
+                        captchaDivExists: !!captchaDiv,
+                        captchaDivVisible: captchaDiv ? captchaDiv.offsetParent !== null : false,
+                        bodyOverflow: document.body.style.overflow,
+                        anyModalOverlay: !!document.querySelector('.modal, .overlay, .popup, [role="dialog"] [aria-modal="true"]')
+                    };
+                });
 
-              console.log('DEBUG INFO (sur page de login):', debugInfo);
+                console.log('DEBUG INFO (sur page de login):', debugInfo);
 
-              // Puis, seulement après avoir loggé les infos :
-              await page.waitForSelector('input[name="email"]', { timeout: 90000, visible: true }); // Attendre qu'il soit visible
+                await page.waitForSelector('input[name="email"]', { timeout: 90000, visible: true });
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Champ email trouvé.`);
 
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Attente du champ mot de passe...`);
-                await page.waitForSelector('input[name="password"]', { timeout: 90000, visible: true }); // Attendre qu'il soit visible
+                await page.waitForSelector('input[name="password"]', { timeout: 90000, visible: true });
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Champ mot de passe trouvé.`);
 
                 await page.click('input[name="email"]', { clickCount: 3 });
                 await page.keyboard.press('Backspace');
                 await humanDelay(300);
 
-                await page.type('input[name="email"]', process.env.GAML_EMAIL, {
-                    delay: 20 + Math.random() * 50
-                });
-
+                await page.type('input[name="email"]', process.env.GAML_EMAIL, { delay: 20 + Math.random() * 50 });
                 await humanDelay(500 + Math.random() * 500);
 
-                await page.type('input[name="password"]', process.env.GAML_PASSWORD, {
-                    delay: 20 + Math.random() * 50
-                });
-
+                await page.type('input[name="password"]', process.env.GAML_PASSWORD, { delay: 20 + Math.random() * 50 });
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Identifiants saisis.`);
-                await humanDelay(2000);
 
+                await humanDelay(2000);
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Soumission du formulaire...`);
+
                 await Promise.all([
                     page.keyboard.press('Enter'),
                     page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 90000 })
@@ -155,7 +147,6 @@ async function login() {
                         console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Aucun message d'erreur explicite. Possiblement un captcha ou blocage.`);
                     }
                 }
-
             } catch (error) {
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ⚠️ Tentative ${attempt} échouée:`, error.message);
                 if (browser && browser.isConnected()) {
