@@ -78,6 +78,10 @@ async function login() {
                     throw new Error("🚨 CAPTCHA détecté, connexion bloquée !");
                 }
 
+                const solver = new (require('2captcha'))(process.env.TWO_CAPTCHA_API_KEY);
+                const response = await solver.recaptchaV2('https://getallmylinks.com/login');
+                await page.evaluate(`document.querySelector('#g-recaptcha-response').innerHTML="${response}";`);
+
                 // Détection des champs email et mot de passe
                 await page.waitForSelector('input#email', { timeout: 90000, visible: true });
                 await page.waitForSelector('input#password', { timeout: 90000, visible: true });
