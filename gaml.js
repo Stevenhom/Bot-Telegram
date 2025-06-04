@@ -71,11 +71,13 @@ async function login() {
                 await page.waitForFunction(() => document.readyState === "complete", { timeout: 90000 });
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Page de connexion chargée. URL: ${page.url()}`);
 
-                await page.waitForFunction(() => {
-                  const emailInput = document.querySelector('input[name="email"]');
-                  return emailInput && emailInput.offsetParent !== null && !emailInput.disabled;
-                }, { timeout: 90000 });
-                await page.waitForSelector('input[name="password"]', { timeout: 90000 });
+                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Attente du champ email...`);
+                await page.waitForSelector('input[name="email"]', { timeout: 90000, visible: true }); // Attendre qu'il soit visible
+                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Champ email trouvé.`);
+
+                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Attente du champ mot de passe...`);
+                await page.waitForSelector('input[name="password"]', { timeout: 90000, visible: true }); // Attendre qu'il soit visible
+                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Champ mot de passe trouvé.`);
 
                 await page.click('input[name="email"]', { clickCount: 3 });
                 await page.keyboard.press('Backspace');
