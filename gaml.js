@@ -67,7 +67,7 @@ async function login() {
         const loginUrl = 'https://getallmylinks.com/login';
         let loginSuccess = false;
 
-        await page.waitForTimeout(5000); // Ajoute un délai de 5 secondes avant la recherche
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Ajoute un délai de 5 secondes avant la recherche
 
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
