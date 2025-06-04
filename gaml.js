@@ -77,32 +77,47 @@ async function login() {
                 await page.waitForFunction(() => document.readyState === "complete", { timeout: 90000 });
                 timeLog(`Page de connexion chargée. URL: ${page.url()}`);
 
+                // DEBUG - Vérification des champs email et mot de passe
                 const debugInfo = await page.evaluate(() => {
                     return {
-                        emailField: document.querySelector('input[name="email"]'),
-                        passwordField: document.querySelector('input[name="password"]'),
+                        emailField: document.querySelector('input#email.form-control'),
+                        passwordField: document.querySelector('input#password.form-control'),
                         captcha: document.querySelector('iframe[src*="recaptcha"]') || document.querySelector('.g-recaptcha, #recaptcha')
                     };
                 });
+
                 console.log('DEBUG INFO:', debugInfo);
 
-                if (!debugInfo.emailInputExists || !debugInfo.passwordInputExists) {
+                // Correction de la condition (emailField et passwordField étaient mal vérifiés)
+                if (!debugInfo.emailField || !debugInfo.passwordField) {
                     throw new Error("Champs email ou mot de passe non trouvés sur la page.");
                 }
 
-                await page.waitForSelector('input[name="email"]', { timeout: 90000, visible: true });
-                await page.waitForSelector('input[name="password"]', { timeout: 90000, visible: true });
+                // Vérifier la visibilité avant d'attendre les sélecteurs
+                const isEmailVisible = await page.evaluate(() => {
+                    const el = document.querySelector('input#email.form-control');
+                    return el ? window.getComputedStyle(el).display !== 'none' : false;
+                });
 
-                await page.click('input[name="email"]', { clickCount: 3 });
+                const isPasswordVisible = await page.evaluate(() => {
+                    const el = document.querySelector('input#password.form-control');
+                    return el ? window.getComputedStyle(el).display !== 'none' : false;
+                });
+
+                console.log(`Email visible : ${isEmailVisible}, Password visible : ${isPasswordVisible}`);
+
+                await page.waitForSelector('input#email.form-control', { timeout: 90000, visible: true });
+                await page.waitForSelector('input#password.form-control', { timeout: 90000, visible: true });
+
+                await page.click('input#email.form-control', { clickCount: 3 });
                 await page.keyboard.press('Backspace');
                 await humanDelay(300);
-                await page.type('input[name="email"]', process.env.GAML_EMAIL, { delay: 20 + Math.random() * 50 });
+                await page.type('input#email.form-control', process.env.GAML_EMAIL, { delay: 20 + Math.random() * 50 });
 
                 await humanDelay(300);
-                await page.type('input[name="password"]', process.env.GAML_PASSWORD, { delay: 20 + Math.random() * 50 });
+                await page.type('input#password.form-control', process.env.GAML_PASSWORD, { delay: 20 + Math.random() * 50 });
 
                 timeLog('Identifiants saisis. Soumission du formulaire...');
-
                 await humanDelay(2000);
 
                 await Promise.all([
@@ -130,7 +145,6 @@ async function login() {
                         console.warn(`⚠️ Aucun message d'erreur visible. CAPTCHA ou autre blocage possible.`);
                     }
                 }
-
             } catch (err) {
                 console.error(`❌ Tentative ${attempt} échouée:`, err.message);
                 if (browser && browser.isConnected()) {
