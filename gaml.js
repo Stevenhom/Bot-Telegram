@@ -52,6 +52,22 @@ async function login() {
         console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Navigateur lancé`);
 
         page = await browser.newPage();
+        
+        // --- DÉBUT DES CHANGEMENTS : AJOUT DES ÉCOUTEURS D'ERREURS ET DE CONSOLE ---
+        page.on('console', async (msg) => {
+            const args = await Promise.all(msg.args().map(arg => arg.jsonValue()));
+            console.log(`BROWSER CONSOLE ${msg.type().toUpperCase()}:`, ...args);
+        });
+
+        page.on('pageerror', (error) => {
+            console.error('BROWSER PAGE ERROR (unhandled exception in page context):', error.message);
+        });
+
+        page.on('requestfailed', (request) => {
+            console.warn(`BROWSER REQUEST FAILED: URL: ${request.url()}, ErrorText: ${request.failure().errorText}`);
+        });
+        // --- FIN DES CHANGEMENTS ---
+
         await page.setUserAgent(
             process.env.USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
         );
@@ -77,13 +93,13 @@ async function login() {
                     const emailInput = document.querySelector('input[name="email"]');
                     const passwordInput = document.querySelector('input[name="password"]');
                     const recaptchaIframe = document.querySelector('iframe[src*="recaptcha"]');
-                    const captchaDiv = document.querySelector('.g-recaptcha, #recaptcha'); // Sélecteurs courants de reCAPTCHA
+                    const captchaDiv = document.querySelector('.g-recaptcha, #recaptcha');
 
                     return {
                         emailInputExists: !!emailInput,
                         emailInputVisible: emailInput ? emailInput.offsetParent !== null : false,
                         emailInputDisabled: emailInput ? emailInput.disabled : false,
-                        emailInputStyle: emailInput ? window.getComputedStyle(emailInput).cssText : null, // Pour voir display, visibility
+                        emailInputStyle: emailInput ? window.getComputedStyle(emailInput).cssText : null,
                         passwordInputExists: !!passwordInput,
                         passwordInputVisible: passwordInput ? passwordInput.offsetParent !== null : false,
                         passwordInputDisabled: passwordInput ? passwordInput.disabled : false,
@@ -91,19 +107,18 @@ async function login() {
                         recaptchaIframeVisible: recaptchaIframe ? recaptchaIframe.offsetParent !== null : false,
                         captchaDivExists: !!captchaDiv,
                         captchaDivVisible: captchaDiv ? captchaDiv.offsetParent !== null : false,
-                        bodyOverflow: document.body.style.overflow, // Si un overlay masque la page
+                        bodyOverflow: document.body.style.overflow,
                         anyModalOverlay: !!document.querySelector('.modal, .overlay, .popup, [role="dialog"] [aria-modal="true"]')
                     };
                 });
 
                 console.log('DEBUG INFO (sur page de login):', debugInfo);
 
-                // Puis, seulement après avoir loggé les infos :
-                await page.waitForSelector('input[name="email"]', { timeout: 90000, visible: true }); // Attendre qu'il soit visible
+                await page.waitForSelector('input[name="email"]', { timeout: 90000, visible: true });
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Champ email trouvé.`);
 
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Attente du champ mot de passe...`);
-                await page.waitForSelector('input[name="password"]', { timeout: 90000, visible: true }); // Attendre qu'il soit visible
+                await page.waitForSelector('input[name="password"]', { timeout: 90000, visible: true });
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Champ mot de passe trouvé.`);
 
                 await page.click('input[name="email"]', { clickCount: 3 });
