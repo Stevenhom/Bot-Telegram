@@ -92,6 +92,9 @@ async function login() {
 
                 timeLog('🛠️ Identifiants saisis, soumission...');
                 await page.keyboard.press('Enter');
+                await page.waitForTimeout(3000); // Attendre 3 secondes pour observer la transition
+                console.log("🔎 Vérification après soumission : ", await page.url());
+
                 await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 90000 });
 
                 const currentUrl = page.url();
