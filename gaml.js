@@ -50,7 +50,7 @@ async function login() {
         browser = await puppeteer.launch(launchOptions);
         timeLog(`🚀 Navigateur lancé : ${await browser.version()}`);
 
-        const context = await browser.createBrowserContext(); // Utiliser un contexte dédié
+        const context = await browser.createBrowserContext();
         page = await context.newPage();
 
         await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
@@ -83,7 +83,7 @@ async function login() {
 
         if (captchaDetected) {
             console.warn("🚨 CAPTCHA détecté. Résous-le manuellement dans le navigateur.");
-            await page.waitForTimeout(60000); // Attente pour validation manuelle
+            await new Promise(resolve => setTimeout(resolve, 60000));
 
             // 📌 Sauvegarder les cookies après validation
             const cookies = await page.cookies();
@@ -101,7 +101,19 @@ async function login() {
         await page.type('input#password', process.env.GAML_PASSWORD, { delay: 20 });
 
         timeLog('🛠️ Identifiants saisis, soumission...');
-        await page.click('button[type="submit"]');
+
+        // 📌 Capture les requêtes HTTP après soumission
+        page.on('request', request => {
+            console.log(`🛠️ Requête envoyée : ${request.url()} | Méthode : ${request.method()}`);
+        });
+        page.on('response', response => {
+            console.log(`📌 Réponse reçue : ${response.url()} | Status : ${response.status()}`);
+        });
+
+        // 📌 Alternative : soumettre directement via JavaScript
+        await page.evaluate(() => {
+            document.querySelector('form')?.submit();
+        });
 
         await Promise.race([
             page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }),
@@ -111,10 +123,16 @@ async function login() {
         const currentUrl = page.url();
         console.log("📌 URL après soumission :", currentUrl);
 
+        // 📌 Vérifier les erreurs affichées sur la page après soumission
+        const errorMessage = await page.evaluate(() => {
+            return document.querySelector('.alert.alert-danger')?.innerText || document.querySelector('.error-message')?.innerText;
+        });
+        console.log("❌ Message d'erreur détecté :", errorMessage || "Aucun message trouvé.");
+
         if (currentUrl.includes('/account') || currentUrl.includes('/dashboard')) {
             timeLog('✅ Connexion réussie !');
         } else {
-            throw new Error("⚠️ Login échoué, possible CAPTCHA ou blocage Cloudflare...");
+            throw new Error(`⚠️ Login échoué, possible CAPTCHA ou blocage Cloudflare... | Erreur détectée : ${errorMessage || "Pas de message"}`);
         }
 
         return { browser, page };
@@ -124,6 +142,7 @@ async function login() {
         throw new Error(`🚨 Échec final dans login: ${error.message}`);
     }
 }
+
 
 
 // Encapsulation avec timeout global
