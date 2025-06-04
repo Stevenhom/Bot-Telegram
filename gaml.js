@@ -36,11 +36,18 @@ async function login() {
             '--disable-web-security',
             '--disable-background-timer-throttling',
             '--disable-backgrounding-occluded-windows',
-            '--disable-renderer-backgrounding'
+            '--disable-renderer-backgrounding',
+            // AJOUTS pour Render/serveurs
+            '--disable-extensions',
+            '--disable-plugins',
+            '--disable-images', // Peut aider à charger plus vite
+            '--no-first-run',
+            '--no-default-browser-check',
+            '--disable-default-apps'
         ],
         headless: 'new',
         ignoreHTTPSErrors: true,
-        defaultViewport: null
+        defaultViewport: { width: 1280, height: 720 } // Définir explicitement
     };
 
     let browser;
@@ -52,12 +59,24 @@ async function login() {
         console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Navigateur lancé`);
 
         page = await browser.newPage();
+        
+        // User agent plus récent et moins détectable
         await page.setUserAgent(
-            process.env.USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
         );
 
-        await page.goto('https://getallmylinks.com', { waitUntil: 'networkidle2', timeout: 90000 });
+        // NOUVELLE APPROCHE: Tester d'abord la page principale
+        await page.goto('https://getallmylinks.com', { 
+            waitUntil: 'networkidle0', // Plus strict
+            timeout: 120000 
+        });
         console.log('✅ Test de navigation réussi : getallmylinks.com chargée.');
+
+        // Ajouter des headers pour paraître plus "normal"
+        await page.setExtraHTTPHeaders({
+            'Accept-Language': 'en-US,en;q=0.9,fr;q=0.8',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+        });
 
         const loginUrl = 'https://getallmylinks.com/login';
         let loginSuccess = false;
@@ -66,57 +85,114 @@ async function login() {
             try {
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] 🔒 Tentative de connexion #${attempt}`);
 
-                await page.goto(loginUrl, { waitUntil: 'networkidle2', timeout: 90000 });
+                await page.goto(loginUrl, { 
+                    waitUntil: 'networkidle0', 
+                    timeout: 120000 
+                });
 
-                await page.waitForFunction(() => document.readyState === "complete", { timeout: 90000 });
+                // DEBUGGING AVANCÉ: Capturer le HTML complet
+                const htmlContent = await page.content();
+                console.log('📄 Longueur du HTML:', htmlContent.length);
+                
+                // Vérifier si on a une page d'erreur ou de blocage
+                const pageTitle = await page.title();
+                console.log('📋 Titre de la page:', pageTitle);
+                
+                const currentUrl = page.url();
+                console.log('🔗 URL actuelle:', currentUrl);
+
+                // Attendre plus longtemps et vérifier le contenu
+                await page.waitForFunction(() => document.readyState === "complete", { timeout: 120000 });
+                
+                // ATTENDRE QUE LE CONTENU SE CHARGE VRAIMENT
+                await page.waitForTimeout(5000); // Attente fixe de 5 secondes
+                
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Page de connexion chargée. URL: ${page.url()}`);
 
+                // DEBUG COMPLET avant d'attendre les sélecteurs
+                const debugInfo = await page.evaluate(() => {
+                    const emailInput = document.querySelector('input[name="email"]');
+                    const passwordInput = document.querySelector('input[name="password"]');
+                    const recaptchaIframe = document.querySelector('iframe[src*="recaptcha"]');
+                    const captchaDiv = document.querySelector('.g-recaptcha, #recaptcha');
+                    
+                    // NOUVEAUX CHECKS
+                    const allInputs = document.querySelectorAll('input').length;
+                    const allForms = document.querySelectorAll('form').length;
+                    const bodyText = document.body ? document.body.innerText.substring(0, 500) : 'NO BODY';
+                    
+                    return {
+                        emailInputExists: !!emailInput,
+                        emailInputVisible: emailInput ? emailInput.offsetParent !== null : false,
+                        emailInputDisabled: emailInput ? emailInput.disabled : false,
+                        emailInputStyle: emailInput ? window.getComputedStyle(emailInput).cssText : null,
+                        passwordInputExists: !!passwordInput,
+                        passwordInputVisible: passwordInput ? passwordInput.offsetParent !== null : false,
+                        passwordInputDisabled: passwordInput ? passwordInput.disabled : false,
+                        recaptchaIframeExists: !!recaptchaIframe,
+                        recaptchaIframeVisible: recaptchaIframe ? recaptchaIframe.offsetParent !== null : false,
+                        captchaDivExists: !!captchaDiv,
+                        captchaDivVisible: captchaDiv ? captchaDiv.offsetParent !== null : false,
+                        bodyOverflow: document.body ? document.body.style.overflow : 'NO BODY',
+                        anyModalOverlay: !!document.querySelector('.modal, .overlay, .popup, [role="dialog"] [aria-modal="true"]'),
+                        // NOUVEAUX
+                        totalInputs: allInputs,
+                        totalForms: allForms,
+                        bodyTextSample: bodyText,
+                        documentReady: document.readyState
+                    };
+                });
+
+                console.log('DEBUG INFO COMPLET (sur page de login):', JSON.stringify(debugInfo, null, 2));
+
+                // Si pas d'inputs du tout, la page est probablement bloquée
+                if (debugInfo.totalInputs === 0) {
+                    console.log('⚠️ AUCUN INPUT DÉTECTÉ - Page possiblement bloquée');
+                    console.log('📄 Extrait du contenu de la page:', debugInfo.bodyTextSample);
+                    
+                    // Essayer d'attendre encore plus
+                    await page.waitForTimeout(10000);
+                    continue; // Passer à la tentative suivante
+                }
+
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Attente du champ email...`);
+                
+                // Essayer différents sélecteurs
+                let emailSelector = 'input[name="email"]';
+                try {
+                    await page.waitForSelector(emailSelector, { timeout: 30000, visible: true });
+                } catch (e) {
+                    console.log('❌ Sélecteur input[name="email"] échoué, tentative avec input[type="email"]');
+                    emailSelector = 'input[type="email"]';
+                    await page.waitForSelector(emailSelector, { timeout: 30000, visible: true });
+                }
+                
+                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Champ email trouvé avec: ${emailSelector}`);
 
-              const debugInfo = await page.evaluate(() => {
-                  const emailInput = document.querySelector('input[name="email"]');
-                  const passwordInput = document.querySelector('input[name="password"]');
-                  const recaptchaIframe = document.querySelector('iframe[src*="recaptcha"]');
-                  const captchaDiv = document.querySelector('.g-recaptcha, #recaptcha'); // Sélecteurs courants de reCAPTCHA
+                // Même chose pour le mot de passe
+                let passwordSelector = 'input[name="password"]';
+                try {
+                    await page.waitForSelector(passwordSelector, { timeout: 30000, visible: true });
+                } catch (e) {
+                    console.log('❌ Sélecteur input[name="password"] échoué, tentative avec input[type="password"]');
+                    passwordSelector = 'input[type="password"]';
+                    await page.waitForSelector(passwordSelector, { timeout: 30000, visible: true });
+                }
+                
+                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Champ mot de passe trouvé avec: ${passwordSelector}`);
 
-                  return {
-                      emailInputExists: !!emailInput,
-                      emailInputVisible: emailInput ? emailInput.offsetParent !== null : false,
-                      emailInputDisabled: emailInput ? emailInput.disabled : false,
-                      emailInputStyle: emailInput ? window.getComputedStyle(emailInput).cssText : null, // Pour voir display, visibility
-                      passwordInputExists: !!passwordInput,
-                      passwordInputVisible: passwordInput ? passwordInput.offsetParent !== null : false,
-                      passwordInputDisabled: passwordInput ? passwordInput.disabled : false,
-                      recaptchaIframeExists: !!recaptchaIframe,
-                      recaptchaIframeVisible: recaptchaIframe ? recaptchaIframe.offsetParent !== null : false,
-                      captchaDivExists: !!captchaDiv,
-                      captchaDivVisible: captchaDiv ? captchaDiv.offsetParent !== null : false,
-                      bodyOverflow: document.body.style.overflow, // Si un overlay masque la page
-                      anyModalOverlay: !!document.querySelector('.modal, .overlay, .popup, [role="dialog"] [aria-modal="true"]')
-                  };
-              });
-
-              console.log('DEBUG INFO (sur page de login):', debugInfo);
-
-              // Puis, seulement après avoir loggé les infos :
-              await page.waitForSelector('input[name="email"]', { timeout: 90000, visible: true }); // Attendre qu'il soit visible
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Champ email trouvé.`);
-
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Attente du champ mot de passe...`);
-                await page.waitForSelector('input[name="password"]', { timeout: 90000, visible: true }); // Attendre qu'il soit visible
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Champ mot de passe trouvé.`);
-
-                await page.click('input[name="email"]', { clickCount: 3 });
+                // Suite du code de connexion...
+                await page.click(emailSelector, { clickCount: 3 });
                 await page.keyboard.press('Backspace');
                 await humanDelay(300);
 
-                await page.type('input[name="email"]', process.env.GAML_EMAIL, {
+                await page.type(emailSelector, process.env.GAML_EMAIL, {
                     delay: 20 + Math.random() * 50
                 });
 
                 await humanDelay(500 + Math.random() * 500);
 
-                await page.type('input[name="password"]', process.env.GAML_PASSWORD, {
+                await page.type(passwordSelector, process.env.GAML_PASSWORD, {
                     delay: 20 + Math.random() * 50
                 });
 
@@ -126,19 +202,19 @@ async function login() {
                 console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Soumission du formulaire...`);
                 await Promise.all([
                     page.keyboard.press('Enter'),
-                    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 90000 })
+                    page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 120000 })
                 ]);
 
-                const currentUrl = page.url();
-                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] URL après soumission: ${currentUrl}`);
+                const currentUrlAfter = page.url();
+                console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] URL après soumission: ${currentUrlAfter}`);
                 await humanDelay(3000);
 
-                if (currentUrl.includes('/account') || currentUrl.includes('/dashboard')) {
+                if (currentUrlAfter.includes('/account') || currentUrlAfter.includes('/dashboard')) {
                     loginSuccess = true;
                     console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ✅ Connexion réussie !`);
                     break;
                 } else {
-                    console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ⚠️ Redirection incorrecte. URL actuelle: ${currentUrl}`);
+                    console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] ⚠️ Redirection incorrecte. URL actuelle: ${currentUrlAfter}`);
 
                     const errorMessage = await page.evaluate(() => {
                         const alertDiv = document.querySelector('.alert.alert-danger');
@@ -152,7 +228,7 @@ async function login() {
                         console.error(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Message d'erreur détecté : "${errorMessage}"`);
                         throw new Error(`Login échoué: ${errorMessage}`);
                     } else {
-                        console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Aucun message d'erreur explicite. Possiblement un captcha ou blocage.`);
+                        console.log(`[${((Date.now() - startTime) / 1000).toFixed(3)}s] Aucun message d'erreur explicite.`);
                     }
                 }
 
@@ -163,7 +239,7 @@ async function login() {
                         await page.reload({ waitUntil: 'domcontentloaded' }).catch(e => console.log("Erreur lors du rechargement:", e.message));
                     }
                 }
-                await humanDelay(5000);
+                await humanDelay(10000); // Attendre plus longtemps entre les tentatives
             }
         }
 
@@ -181,6 +257,19 @@ async function login() {
             console.log("Navigateur fermé après erreur critique.");
         }
         throw new Error(`Échec final dans login: ${error.message}`);
+    }
+}
+
+// Solution 2: Alternative avec screenshot pour debugging
+async function debugWithScreenshot(page, filename = 'debug.png') {
+    try {
+        await page.screenshot({ 
+            path: filename, 
+            fullPage: true 
+        });
+        console.log(`📸 Screenshot sauvé: ${filename}`);
+    } catch (e) {
+        console.log('❌ Impossible de prendre un screenshot:', e.message);
     }
 }
 
