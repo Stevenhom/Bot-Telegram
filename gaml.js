@@ -77,6 +77,8 @@ async function login() {
                 await page.waitForFunction(() => document.readyState === "complete", { timeout: 90000 });
                 timeLog(`Page de connexion chargée. URL: ${page.url()}`);
 
+                console.log(await page.content());
+
                 // DEBUG - Vérification des champs email et mot de passe
                 const debugInfo = await page.evaluate(() => {
                     return {
