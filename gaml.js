@@ -68,22 +68,17 @@ async function login() {
                 timeLog(`🔒 Tentative de connexion #${attempt}`);
                 await page.goto(loginUrl, { waitUntil: 'networkidle2', timeout: 90000 });
 
-                const pageContent = await page.content();
-                if (pageContent.includes("Access denied | Cloudflare")) {
-                    throw new Error("🚨 Cloudflare bloque l'accès !");
+                // Vérification du CAPTCHA
+                const captchaDetected = await page.evaluate(() => {
+                    return document.querySelector('iframe[src*="recaptcha"]') || document.querySelector('.g-recaptcha, #recaptcha');
+                });
+                console.log(`🔎 Présence d'un CAPTCHA : ${captchaDetected ? "⚠️ Oui" : "✅ Non"}`);
+
+                if (captchaDetected) {
+                    throw new Error("🚨 CAPTCHA détecté, connexion bloquée !");
                 }
 
-                const debugInfo = await page.evaluate(() => ({
-                    emailField: document.querySelector('input#email'),
-                    passwordField: document.querySelector('input#password')
-                }));
-
-                console.log('DEBUG INFO:', debugInfo);
-
-                if (!debugInfo.emailField || !debugInfo.passwordField) {
-                    throw new Error("❌ Champs email ou mot de passe introuvables !");
-                }
-
+                // Détection des champs email et mot de passe
                 await page.waitForSelector('input#email', { timeout: 90000, visible: true });
                 await page.waitForSelector('input#password', { timeout: 90000, visible: true });
 
@@ -91,19 +86,29 @@ async function login() {
                 await page.type('input#password', process.env.GAML_PASSWORD, { delay: 20 });
 
                 timeLog('🛠️ Identifiants saisis, soumission...');
-                await page.keyboard.press('Enter');
-                await new Promise(resolve => setTimeout(resolve, 5000)); // Attendre 3 secondes pour observer la transition
-                console.log("🔎 Vérification après soumission : ", await page.url());
+                
+                // Alternative : soumettre via bouton plutôt qu'Enter
+                await page.click('button[type="submit"]');
 
-                await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 90000 });
+                // Vérification des réponses HTTP
+                page.on('response', response => {
+                    console.log(`🔎 Réponse reçue : ${response.url()} | Status: ${response.status()}`);
+                });
+
+                await Promise.race([
+                    page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }),
+                    new Promise(resolve => setTimeout(resolve, 30000))
+                ]);
 
                 const currentUrl = page.url();
+                console.log("📌 URL après soumission :", currentUrl);
+
                 if (currentUrl.includes('/account') || currentUrl.includes('/dashboard')) {
                     loginSuccess = true;
                     timeLog('✅ Connexion réussie !');
                     break;
                 } else {
-                    throw new Error("⚠️ Login échoué, possible CAPTCHA ou Cloudflare...");
+                    throw new Error("⚠️ Login échoué, possible CAPTCHA ou blocage Cloudflare...");
                 }
             } catch (err) {
                 console.error(`❌ Tentative ${attempt} échouée :`, err.message);
