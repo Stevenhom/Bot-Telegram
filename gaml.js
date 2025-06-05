@@ -96,7 +96,10 @@ async function login() {
         // ✅ Capture des erreurs affichées sur la page après soumission (Correction de `text is not iterable`)
         const consoleErrors = await page.evaluate(() => {
             const errors = document.querySelectorAll('.error-message');
-            return errors.length ? Array.from(errors).map(el => el.innerText) : [];
+            if (!errors || errors.length === 0) {
+                return []; // Évite l'erreur en retournant un tableau vide
+            }
+            return Array.from(errors).map(el => el.innerText);
         });
         console.log("🚨 Erreurs détectées :", consoleErrors.length ? consoleErrors : "Aucune erreur visible.");
 
