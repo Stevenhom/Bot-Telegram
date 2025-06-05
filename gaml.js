@@ -97,11 +97,11 @@ async function login() {
         const consoleErrors = await page.evaluate(() => {
             const errors = document.querySelectorAll('.error-message');
             if (!errors || errors.length === 0) {
-                return []; // Évite l'erreur en retournant un tableau vide
+                return ["⚠️ Aucun message d'erreur détecté sur la page."];
             }
-            return Array.from(errors).map(el => el.innerText);
+            return Array.from(errors, el => el.innerText);
         });
-        console.log("🚨 Erreurs détectées :", consoleErrors.length ? consoleErrors : "Aucune erreur visible.");
+        console.log("🚨 Erreurs détectées :", consoleErrors.join(', '));
 
         // ✅ Capture de l'état avant soumission
         await page.screenshot({ path: 'before-submit.png' });
