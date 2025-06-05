@@ -17,7 +17,12 @@ const IS_RENDER = process.env.RENDER === 'true';
 
 async function login() {
     const startTime = Date.now();
-   
+    const timeLog = (msg) => {
+        const delta = ((Date.now() - startTime) / 1000).toFixed(3);
+        console.log(`[${delta}s] ${msg}`);
+    };
+
+    timeLog("🔑 Début de la connexion dans la fonction login...");
 
     let executablePath = puppeteer.executablePath();
     if (!executablePath) {
@@ -45,8 +50,6 @@ async function login() {
         ignoreHTTPSErrors: true,
     };
 
-    
-
     let browser;
     let page;
 
@@ -54,8 +57,6 @@ async function login() {
         browser = await puppeteer.launch(launchOptions);
         const version = await browser.version();
         console.log('Version Chrome:', version);
-
-        
 
         page = await browser.newPage();
 
@@ -66,7 +67,7 @@ async function login() {
         );
 
         try {
-            await page.goto('https://getallmylinks.com', { waitUntil: 'domcontentloaded', timeout: 90000 });
+            await page.goto('https://getallmylinks.com', { waitUntil: 'domcontentloaded', timeout: 120000 });
             console.log('✅ Test de navigation réussi : getallmylinks.com chargée.');
         } catch (e) {
             console.error('❌ Test de navigation échoué:', e.message);
@@ -78,17 +79,15 @@ async function login() {
 
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
-                
+                console.log(`🔁 Tentative de connexion ${attempt}/3`);
 
                 await Promise.all([
-                    page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60000 }),
-                    page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 60000 })
+                    page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 120000 }),
+                    page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 120000 })
                 ]);
 
-                
-
-                await page.waitForSelector('input[name="email"]', { timeout: 30000, visible: true });
-                await page.waitForSelector('input[name="password"]', { timeout: 30000, visible: true });
+                await page.waitForSelector('input[name="email"]', { timeout: 45000, visible: true });
+                await page.waitForSelector('input[name="password"]', { timeout: 45000, visible: true });
 
                 await page.click('input[name="email"]', { clickCount: 3 });
                 await page.keyboard.press('Backspace');
@@ -104,29 +103,33 @@ async function login() {
                     delay: 20 + Math.random() * 50
                 });
 
-                
                 await humanDelay(500);
 
                 await Promise.all([
                     page.click('button[type="submit"]'),
-                    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 45000 })
+                    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 60000 })
                 ]);
 
                 const currentUrl = page.url();
-                
+                console.log("📌 URL après soumission :", currentUrl);
 
                 await humanDelay(2000);
 
+                // 📌 Capture du contenu de la page après soumission pour analyser d'éventuels blocages
+                const pageContent = await page.content();
+                console.log("📄 Contenu de la page après soumission :\n", pageContent.slice(0, 1000));
+
                 if (currentUrl.includes('/account')) {
                     loginSuccess = true;
-                    
+                    console.log("✅ Connexion réussie !");
                     break;
                 } else {
-                    
+                    console.warn("⚠️ Connexion échouée, tentative suivante...");
                 }
 
             } catch (error) {
-                
+                console.error(`❌ Erreur lors de la tentative ${attempt}:`, error.message);
+
                 if (browser && browser.isConnected()) {
                     await page.reload({ waitUntil: 'domcontentloaded' }).catch(e => console.log("Erreur lors du rechargement:", e.message));
                 }
@@ -135,19 +138,17 @@ async function login() {
         }
 
         if (!loginSuccess) {
-            throw new Error('Échec de la connexion après 3 tentatives.');
+            throw new Error('🚨 Échec de la connexion après 3 tentatives.');
         }
 
-        
         return { browser, page };
 
     } catch (error) {
-        
+        console.error("❌ Erreur critique :", error.message);
         if (browser && browser.isConnected()) await browser.close();
-        
+        throw new Error(`🚨 Échec final dans login: ${error.message}`);
     }
 }
-
 
 
 // Encapsulation avec timeout global
