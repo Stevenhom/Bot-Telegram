@@ -23,13 +23,14 @@ async function login() {
 
     timeLog("🔑 Début de la connexion dans la fonction login...");
 
-    let executablePath = puppeteer.resolveExecutablePath('chrome');
+    let executablePath = puppeteer.executablePath();
     if (!executablePath) {
         console.warn('⚠️ Chemin Chromium non trouvé via puppeteer.executablePath(), utilisation d\'un chemin par défaut Render...');
         executablePath = '/opt/render/.cache/puppeteer/chrome/linux-136.0.7103.94/chrome-linux64/chrome';
     }
 
     console.log('Chemin Chromium Puppeteer:', executablePath);
+
 
     const launchOptions = {
         executablePath,
