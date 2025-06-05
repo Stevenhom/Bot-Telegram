@@ -35,8 +35,6 @@ WORKDIR /app
 COPY package*.json ./
 
 # Étape 5 : Variables d'environnement pour Puppeteer
-# PUPPETEER_SKIP_DOWNLOAD=false garantit que Puppeteer télécharge Chromium.
-# PUPPETEER_CACHE_DIR définit où Chromium sera mis en cache dans le conteneur.
 ENV PUPPETEER_SKIP_DOWNLOAD=false
 ENV PUPPETEER_CACHE_DIR=/app/.cache/puppeteer
 
@@ -48,19 +46,15 @@ RUN npm install --legacy-peer-deps && npm cache clean --force && \
     npx puppeteer browsers install chrome
 
 # Étape 8 : Copier le certificat Bright Data dans le système de fichiers du conteneur
-# Assurez-vous que "BrightData SSL certificate (port 33335).crt" est à la racine de votre projet
-# et que ce Dockerfile est dans le même répertoire.
-COPY "BrightData SSL certificate (port 33335).crt" /usr/local/share/ca-certificates/
+COPY brightdata.crt /usr/local/share/ca-certificates/
 
 # Étape 9 : Mettre à jour les certificats de l'autorité de certification système et importer dans NSS
-# Cette étape rend le certificat Bright Data fiable pour les applications utilisant NSS, comme Chromium.
-# Nous définissons HOME temporairement pour permettre à certutil de créer sa base de données NSS.
 ENV HOME /tmp
 RUN update-ca-certificates && \
     mkdir -p $HOME/.pki/nssdb && \
     chmod 700 $HOME/.pki/nssdb && \
     certutil -d $HOME/.pki/nssdb -N --empty-password && \
-    certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "BrightData CA" -i /usr/local/share/ca-certificates/brightdata-ca.crt
+    certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "BrightData CA" -i /usr/local/share/ca-certificates/brightdata.crt
 
 # Étape 10 : Copier le reste du code de l'application dans le conteneur
 COPY . .
@@ -69,5 +63,4 @@ COPY . .
 # EXPOSE 10000
 
 # Étape 12 : Commande par défaut pour démarrer votre bot
-# Assurez-vous que 'bot.js' est bien le point d'entrée principal de votre application.
 CMD ["node", "bot.js"]
