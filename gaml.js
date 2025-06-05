@@ -15,6 +15,33 @@ const pTimeout = require('p-timeout');
 // Configuration des constantes en haut du fichier
 const IS_RENDER = process.env.RENDER === 'true';
 
+Comprendre et Corriger les Erreurs de Votre Bot Render
+Vos logs de Render révèlent deux problèmes distincts mais critiques : une erreur liée à votre bot Telegram et un problème persistant de timeout Puppeteer. Nous allons apporter les modifications nécessaires à votre fonction login et discuter de la correction de l'erreur Telegram.
+
+1. Correction de l'Erreur Telegram : 409 Conflict
+Avant même d'aborder Puppeteer, l'erreur TelegramError: 409: Conflict: terminated by other getUpdates request; make sure that only one bot instance is running est fondamentale. Elle signifie que plusieurs instances de votre bot Telegram tentent de se connecter à l'API Telegram en même temps en utilisant le même jeton (token). Telegram autorise une seule connexion getUpdates par token à la fois.
+
+Ce n'est pas un problème de code dans votre fonction login, mais un problème de déploiement ou de configuration de votre service Render.
+
+Pour résoudre cette erreur, vous devez :
+
+Vérifier vos services Render : Connectez-vous à votre tableau de bord Render et assurez-vous que vous n'avez qu'un seul service actif qui exécute votre code bot Telegram et utilise le même BOT_TOKEN. Si vous en trouvez plusieurs, supprimez les duplicatas.
+S'assurer d'une seule instance : Confirmez que votre service Render est configuré pour ne pas faire de mise à l'échelle horizontale et qu'il ne lance qu'une seule instance de votre application. C'est le comportement par défaut, mais vérifiez les paramètres de votre service.
+Tant que cette erreur Telegram n'est pas résolue, votre service bot ne fonctionnera pas correctement et ne pourra pas exécuter les tâches Puppeteer de manière fiable.
+
+2. Modifications de la Fonction login pour Contourner Cloudflare
+L'erreur TimeoutError: Promise timed out after 90000 milliseconds sur Puppeteer, même avec le StealthPlugin, indique que Cloudflare identifie toujours votre environnement Render comme un bot et ne rend pas le formulaire de connexion. La solution la plus robuste est l'utilisation d'un proxy résidentiel.
+
+Voici les modifications à apporter à votre fonction login :
+
+JavaScript
+
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+puppeteer.use(StealthPlugin());
+
+const pTimeout = require('p-timeout'); // Assurez-vous que cette ligne est bien présente en haut de votre fichier
+
 async function login() {
     const startTime = Date.now();
     const timeLog = (msg) => {
@@ -44,10 +71,16 @@ async function login() {
             '--disable-web-security',
             '--disable-background-timer-throttling',
             '--disable-backgrounding-occluded-windows',
-            '--disable-renderer-backgrounding'
+            '--disable-renderer-backgrounding',
+            // --- AJOUT DES ARGUMENTS POUR LE PROXY ---
+            // Assurez-vous que PROXY_HOST et PROXY_PORT sont définis dans vos variables d'environnement Render.
+            // Exemple: http://my.proxy.host:port
+            ...(process.env.PROXY_HOST && process.env.PROXY_PORT ? [`--proxy-server=http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}`] : []),
+            // ------------------------------------------
         ],
-        headless: true,
+        headless: true, // Conservez 'true' pour Render, 'new' est aussi une option valide
         ignoreHTTPSErrors: true,
+        defaultViewport: null // Ajouté pour s'assurer que le viewport est géré par --window-size
     };
 
     let browser;
@@ -59,13 +92,46 @@ async function login() {
         console.log('Version Chrome:', version);
 
         page = await browser.newPage();
+
+        // --- AJOUT DE L'AUTHENTIFICATION DU PROXY ---
+        // Cette partie doit être après page = await browser.newPage();
+        if (process.env.PROXY_USERNAME && process.env.PROXY_PASSWORD) {
+            await page.authenticate({
+                username: process.env.PROXY_USERNAME,
+                password: process.env.PROXY_PASSWORD
+            });
+            console.log('✅ Authentification du proxy configurée.');
+        } else if (process.env.PROXY_HOST) {
+            console.warn('⚠️ PROXY_HOST est défini, mais PROXY_USERNAME/PROXY_PASSWORD ne le sont pas. Le proxy pourrait nécessiter une authentification.');
+        }
+        // ------------------------------------------
+
         await page.setUserAgent(
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+            process.env.USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
             'AppleWebKit/537.36 (KHTML, like Gecko) ' +
-            'Chrome/125.0.0.0 Safari/537.36'
+            'Chrome/125.0.0.0 Safari/537.36' // Utilisez une version de Chrome récente
         );
 
-        await page.goto('https://getallmylinks.com', { waitUntil: 'domcontentloaded', timeout: 120000 });
+        // --- Réactivation des logs détaillés ---
+        page.on('console', async (msg) => {
+            const args = await Promise.all(msg.args().map(arg => arg.jsonValue()));
+            console.log(`BROWSER CONSOLE ${msg.type().toUpperCase()}:`, ...args);
+        });
+
+        page.on('pageerror', (error) => {
+            console.error('BROWSER PAGE ERROR (exception non gérée dans le contexte de la page):', error.message);
+        });
+
+        page.on('requestfailed', (request) => {
+            console.warn(`BROWSER REQUEST FAILED: URL: ${request.url()}, Texte Erreur: ${request.failure()?.errorText}`);
+        });
+        // Votre log de requêtes envoyées est déjà là:
+        page.on('request', request => {
+            console.log(`🛠️ Requête envoyée : ${request.url()} | Méthode : ${request.method()}`);
+        });
+        // ------------------------------------------
+
+        await page.goto('https://getallmylinks.com', { waitUntil: 'networkidle2', timeout: 120000 }); // Changé à 'networkidle2'
         console.log('✅ Test de navigation réussi : getallmylinks.com chargée.');
 
         const loginUrl = 'https://getallmylinks.com/login';
@@ -74,7 +140,18 @@ async function login() {
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
                 console.log(`🔁 Tentative de connexion ${attempt}/3`);
-                await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 120000 });
+                await page.goto(loginUrl, { waitUntil: 'networkidle2', timeout: 120000 }); // Changé à 'networkidle2'
+
+                // --- Vérification du reCAPTCHA avant de tenter de saisir ---
+                const recaptchaIframe = await page.$('iframe[src*="recaptcha/api2/anchor"]');
+                if (recaptchaIframe) {
+                    console.warn("⚠️ reCAPTCHA détecté. Le bot ne pourra pas le résoudre automatiquement.");
+                    // Vous pouvez ajouter ici un mécanisme de résolution de reCAPTCHA si vous en avez un (par ex. 2Captcha)
+                    // Pour l'instant, nous allons simplement loguer et potentiellement échouer si le reCAPTCHA bloque le formulaire
+                    // await new Promise(resolve => setTimeout(resolve, 5000)); // Laisser le temps à reCAPTCHA de charger
+                    // Si vous avez un service comme 2Captcha, vous l'intégreriez ici.
+                    // Sinon, si le reCAPTCHA invisible est bloquant, même un proxy ne suffira pas sans résolution.
+                }
 
                 await page.waitForSelector('input[name="email"]', { timeout: 45000, visible: true });
                 await page.waitForSelector('input[name="password"]', { timeout: 45000, visible: true });
@@ -84,11 +161,6 @@ async function login() {
                 await page.type('input[name="email"]', process.env.GAML_EMAIL, { delay: 50 });
 
                 await page.type('input[name="password"]', process.env.GAML_PASSWORD, { delay: 50 });
-
-                // 📌 Ajout de logs sur les requêtes envoyées après soumission
-                page.on('request', request => {
-                    console.log(`🛠️ Requête envoyée : ${request.url()} | Méthode : ${request.method()}`);
-                });
 
                 // 📌 Soumission forcée du formulaire via JavaScript
                 await page.evaluate(() => {
@@ -111,11 +183,18 @@ async function login() {
                     console.log("✅ Connexion réussie !");
                     break;
                 } else {
-                    console.warn("⚠️ Connexion échouée, tentative suivante...");
+                    console.warn("⚠️ Connexion échouée, URL actuelle:", currentUrl, "tentative suivante...");
                 }
 
             } catch (error) {
                 console.error(`❌ Erreur lors de la tentative ${attempt}:`, error.message);
+
+                // Sauvegarder une capture d'écran en cas d'erreur pour le débogage
+                const screenshotPath = `/tmp/error-attempt-${attempt}.png`;
+                await page.screenshot({ path: screenshotPath }).catch(e => console.log("Erreur lors de la capture d'écran:", e.message));
+                console.log(`📸 Capture d'écran enregistrée à: ${screenshotPath}`);
+                // Note: Les fichiers dans /tmp sont éphémères sur Render et disparaîtront après la session.
+                // Vous ne pourrez pas les récupérer directement, mais cela peut être utile pour des outils de débogage avancés si Render les expose.
 
                 if (browser && browser.isConnected()) {
                     await page.reload({ waitUntil: 'domcontentloaded' }).catch(e => console.log("Erreur lors du rechargement:", e.message));
