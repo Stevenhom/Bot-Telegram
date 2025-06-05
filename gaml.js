@@ -45,6 +45,9 @@ async function login() {
     };
 
     let browser, page;
+    if (!browser) {
+        throw new Error("🚨 Échec du lancement de Puppeteer, `browser` est undefined !");
+    }
 
     try {
         browser = await puppeteer.launch(launchOptions);
@@ -95,6 +98,11 @@ async function login() {
         await page.type(emailSelector, process.env.USER_EMAIL, { delay: 50 });
         await page.type(passwordSelector, process.env.USER_PASSWORD, { delay: 50 });
 
+        const consoleErrors = await page.evaluate(() => {
+          return [...document.querySelectorAll('.error-message')].map(el => el.innerText);
+      });
+      console.log("🚨 Erreurs détectées :", consoleErrors.length ? consoleErrors : "Aucune erreur visible.");
+
         // Capture de l'état avant soumission
         await page.screenshot({ path: 'before-submit.png' });
         timeLog("📸 Screenshot enregistré : before-submit.png");
@@ -103,8 +111,9 @@ async function login() {
         await page.click(submitSelector);
         timeLog("🛠️ Formulaire soumis.");
 
+
         // Attendre redirection ou confirmation
-        await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 10000 });
+        await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60000 });
         timeLog("✅ Connexion réussie (probable).");
 
         // ... continuation éventuelle (cookies, confirmation, etc.)
