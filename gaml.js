@@ -23,7 +23,7 @@ async function login() {
 
     timeLog("🔑 Début de la connexion dans la fonction login...");
 
-    let executablePath = puppeteer.executablePath();
+    let executablePath = puppeteer.resolveExecutablePath('chrome');
     if (!executablePath) {
         console.warn('⚠️ Chemin Chromium non trouvé via puppeteer.executablePath(), utilisation d\'un chemin par défaut Render...');
         executablePath = '/opt/render/.cache/puppeteer/chrome/linux-136.0.7103.94/chrome-linux64/chrome';
@@ -36,6 +36,7 @@ async function login() {
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
+            '--ignore-certificate-errors',
             '--disable-dev-shm-usage',
             '--disable-gpu',
             '--disable-infobars',
@@ -80,25 +81,6 @@ async function login() {
             'AppleWebKit/537.36 (KHTML, like Gecko) ' +
             'Chrome/125.0.0.0 Safari/537.36' // Utilisez une version de Chrome récente
         );
-
-        // --- Réactivation des logs détaillés ---
-        page.on('console', async (msg) => {
-            const args = await Promise.all(msg.args().map(arg => arg.jsonValue()));
-            console.log(`BROWSER CONSOLE ${msg.type().toUpperCase()}:`, ...args);
-        });
-
-        page.on('pageerror', (error) => {
-            console.error('BROWSER PAGE ERROR (exception non gérée dans le contexte de la page):', error.message);
-        });
-
-        page.on('requestfailed', (request) => {
-            console.warn(`BROWSER REQUEST FAILED: URL: ${request.url()}, Texte Erreur: ${request.failure()?.errorText}`);
-        });
-        // Votre log de requêtes envoyées est déjà là:
-        page.on('request', request => {
-            console.log(`🛠️ Requête envoyée : ${request.url()} | Méthode : ${request.method()}`);
-        });
-        // ------------------------------------------
 
         await page.goto('https://getallmylinks.com', { waitUntil: 'networkidle2', timeout: 120000 }); // Changé à 'networkidle2'
         console.log('✅ Test de navigation réussi : getallmylinks.com chargée.');
