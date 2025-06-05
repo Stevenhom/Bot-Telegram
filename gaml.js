@@ -17,125 +17,136 @@ const IS_RENDER = process.env.RENDER === 'true';
 
 async function login() {
     const startTime = Date.now();
-    const timeLog = (msg) => {
-        const delta = ((Date.now() - startTime) / 1000).toFixed(3);
-        console.log(`[${delta}s] ${msg}`);
-    };
+   
 
-    timeLog("🔑 Début de la connexion dans la fonction login...");
+    let executablePath = puppeteer.executablePath();
+    if (!executablePath) {
+        console.warn('⚠️ Chemin Chromium non trouvé via puppeteer.executablePath(), utilisation d\'un chemin par défaut Render...');
+        executablePath = '/opt/render/.cache/puppeteer/chrome/linux-136.0.7103.94/chrome-linux64/chrome';
+    }
 
-    const resolvedExecutablePath = process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath();
-    console.log(resolvedExecutablePath ? `✅ Chemin Chromium utilisé: ${resolvedExecutablePath}` : `⚠️ Aucun chemin Chromium défini !`);
+    console.log('Chemin Chromium Puppeteer:', executablePath);
 
     const launchOptions = {
+        executablePath,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
-            '--disable-blink-features=AutomationControlled',
             '--disable-dev-shm-usage',
-            '--disable-web-security',
             '--disable-gpu',
             '--disable-infobars',
-            '--window-size=1280,720'
+            '--window-size=1280,720',
+            '--disable-web-security',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding'
         ],
         headless: true,
-        executablePath: resolvedExecutablePath,
         ignoreHTTPSErrors: true,
-        defaultViewport: null
     };
 
-    let browser, page;
+    
+
+    let browser;
+    let page;
 
     try {
         browser = await puppeteer.launch(launchOptions);
-        if (!browser) {
-            throw new Error("🚨 Échec du lancement de Puppeteer, `browser` est undefined !");
+        const version = await browser.version();
+        console.log('Version Chrome:', version);
+
+        
+
+        page = await browser.newPage();
+
+        await page.setUserAgent(
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+            'AppleWebKit/537.36 (KHTML, like Gecko) ' +
+            'Chrome/125.0.0.0 Safari/537.36'
+        );
+
+        try {
+            await page.goto('https://getallmylinks.com', { waitUntil: 'domcontentloaded', timeout: 90000 });
+            console.log('✅ Test de navigation réussi : getallmylinks.com chargée.');
+        } catch (e) {
+            console.error('❌ Test de navigation échoué:', e.message);
+            throw e;
         }
 
-        timeLog(`🚀 Navigateur lancé : ${await browser.version()}`);
+        const loginUrl = 'https://getallmylinks.com/login';
+        let loginSuccess = false;
 
-        const context = await browser.createBrowserContext();
-        page = await context.newPage();
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                
 
-        // ✅ Désactive les détections automatisées (bot)
-        await page.evaluateOnNewDocument(() => {
-            Object.defineProperty(navigator, 'webdriver', { get: () => false });
-            Object.defineProperty(navigator, 'languages', { get: () => ['fr-FR', 'fr'] });
-            Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3] });
-        });
+                await Promise.all([
+                    page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60000 }),
+                    page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 60000 })
+                ]);
 
-        // ✅ Log des erreurs JS de la page
-        page.on('console', (msg) => {
-            if (msg.type() === 'error') console.error('🚨 Console error:', msg.text());
-        });
+                
 
-        // ✅ User-Agent plus réaliste
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36');
+                await page.waitForSelector('input[name="email"]', { timeout: 30000, visible: true });
+                await page.waitForSelector('input[name="password"]', { timeout: 30000, visible: true });
 
-        // ✅ Aller à la page de connexion
-        await page.goto('https://getallmylinks.com/login', { waitUntil: 'networkidle2', timeout: 90000 });
-        timeLog("✅ Page de connexion chargée.");
+                await page.click('input[name="email"]', { clickCount: 3 });
+                await page.keyboard.press('Backspace');
+                await humanDelay(200);
 
-        // ✅ Vérifie les sélecteurs du formulaire
-        const emailSelector = 'input[type="email"]';
-        const passwordSelector = 'input[type="password"]';
-        const submitSelector = 'button[type="submit"]';
+                await page.type('input[name="email"]', process.env.GAML_EMAIL, {
+                    delay: 20 + Math.random() * 50
+                });
 
-        const emailExists = await page.$(emailSelector);
-        const passwordExists = await page.$(passwordSelector);
-        const submitExists = await page.$(submitSelector);
+                await humanDelay(300 + Math.random() * 300);
 
-        if (!emailExists || !passwordExists || !submitExists) {
-            throw new Error("❌ Champs email/mot de passe/bouton non trouvés.");
-        }
+                await page.type('input[name="password"]', process.env.GAML_PASSWORD, {
+                    delay: 20 + Math.random() * 50
+                });
 
-        // ✅ Remplit le formulaire
-        await page.type(emailSelector, process.env.USER_EMAIL, { delay: 50 });
-        await page.type(passwordSelector, process.env.USER_PASSWORD, { delay: 50 });
+                
+                await humanDelay(500);
 
-        // ✅ Capture des erreurs affichées sur la page après soumission (Correction de `text is not iterable`)
-        const consoleErrors = await page.evaluate(() => {
-            const errors = document.querySelectorAll('.error-message');
-            if (!errors || errors.length === 0) {
-                return ["⚠️ Aucun message d'erreur détecté sur la page."];
+                await Promise.all([
+                    page.click('button[type="submit"]'),
+                    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 45000 })
+                ]);
+
+                const currentUrl = page.url();
+                
+
+                await humanDelay(2000);
+
+                if (currentUrl.includes('/account')) {
+                    loginSuccess = true;
+                    
+                    break;
+                } else {
+                    
+                }
+
+            } catch (error) {
+                
+                if (browser && browser.isConnected()) {
+                    await page.reload({ waitUntil: 'domcontentloaded' }).catch(e => console.log("Erreur lors du rechargement:", e.message));
+                }
+                await humanDelay(3000);
             }
-            return Array.from(errors, el => el.innerText);
-        });
-        console.log("🚨 Erreurs détectées :", consoleErrors.join(', '));
-
-        // ✅ Capture de l'état avant soumission
-        await page.screenshot({ path: 'before-submit.png' });
-        timeLog("📸 Screenshot enregistré : before-submit.png");
-
-        // ✅ Soumettre le formulaire
-        await page.click(submitSelector);
-        timeLog("🛠️ Formulaire soumis.");
-
-        // ✅ Attendre la redirection avec un délai plus long pour éviter les timeouts
-        await Promise.race([
-            page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60000 }),
-            new Promise(resolve => setTimeout(resolve, 60000))
-        ]);
-
-        const currentUrl = page.url();
-        console.log("📌 URL après soumission :", currentUrl);
-
-        if (currentUrl.includes('/account') || currentUrl.includes('/dashboard')) {
-            timeLog('✅ Connexion réussie !');
-        } else {
-            throw new Error(`⚠️ Login échoué, possible CAPTCHA ou blocage Cloudflare... | Erreur détectée : ${consoleErrors.length ? consoleErrors.join(', ') : "Pas de message"}`);
         }
 
-        await browser.close();
-        timeLog("🧹 Navigateur fermé.");
+        if (!loginSuccess) {
+            throw new Error('Échec de la connexion après 3 tentatives.');
+        }
 
-    } catch (err) {
-        console.error("❌ Erreur critique :", err.message);
+        
+        return { browser, page };
+
+    } catch (error) {
+        
         if (browser && browser.isConnected()) await browser.close();
-        throw new Error(`🚨 Échec final dans login: ${err.message}`);
+        
     }
 }
-
 
 
 
