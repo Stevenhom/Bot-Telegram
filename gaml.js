@@ -45,43 +45,39 @@ async function login() {
     };
 
     let browser, page;
-    if (!browser) {
-        throw new Error("🚨 Échec du lancement de Puppeteer, `browser` est undefined !");
-    }
 
     try {
+        // ✅ Assure que Puppeteer se lance correctement
         browser = await puppeteer.launch(launchOptions);
+        if (!browser) {
+            throw new Error("🚨 Échec du lancement de Puppeteer, `browser` est undefined !");
+        }
+
         timeLog(`🚀 Navigateur lancé : ${await browser.version()}`);
 
         const context = await browser.createBrowserContext();
         page = await context.newPage();
 
-        // Désactive les détections automatisées (bot)
+        // ✅ Désactive les détections automatisées (bot)
         await page.evaluateOnNewDocument(() => {
-            Object.defineProperty(navigator, 'webdriver', {
-                get: () => false,
-            });
-            Object.defineProperty(navigator, 'languages', {
-                get: () => ['fr-FR', 'fr'],
-            });
-            Object.defineProperty(navigator, 'plugins', {
-                get: () => [1, 2, 3],
-            });
+            Object.defineProperty(navigator, 'webdriver', { get: () => false });
+            Object.defineProperty(navigator, 'languages', { get: () => ['fr-FR', 'fr'] });
+            Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3] });
         });
 
-        // Log des erreurs JS de la page
+        // ✅ Log des erreurs JS de la page
         page.on('console', (msg) => {
             if (msg.type() === 'error') console.error('🚨 Console error:', msg.text());
         });
 
-        // Optionnel : User-Agent plus réaliste
+        // ✅ User-Agent plus réaliste
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36');
 
-        // Aller à la page de connexion
-        await page.goto('https://getallmylinks.com/login', { waitUntil: 'networkidle2' });
+        // ✅ Aller à la page de connexion
+        await page.goto('https://getallmylinks.com/login', { waitUntil: 'networkidle2', timeout: 90000 });
         timeLog("✅ Page de connexion chargée.");
 
-        // Vérifie les sélecteurs du formulaire
+        // ✅ Vérifie les sélecteurs du formulaire
         const emailSelector = 'input[type="email"]';
         const passwordSelector = 'input[type="password"]';
         const submitSelector = 'button[type="submit"]';
@@ -94,37 +90,49 @@ async function login() {
             throw new Error("❌ Champs email/mot de passe/bouton non trouvés.");
         }
 
-        // Remplit le formulaire
+        // ✅ Remplit le formulaire
         await page.type(emailSelector, process.env.USER_EMAIL, { delay: 50 });
         await page.type(passwordSelector, process.env.USER_PASSWORD, { delay: 50 });
 
+        // ✅ Capture des erreurs affichées sur la page après soumission
         const consoleErrors = await page.evaluate(() => {
-          return [...document.querySelectorAll('.error-message')].map(el => el.innerText);
-      });
-      console.log("🚨 Erreurs détectées :", consoleErrors.length ? consoleErrors : "Aucune erreur visible.");
+            return [...document.querySelectorAll('.error-message')].map(el => el.innerText);
+        });
+        console.log("🚨 Erreurs détectées :", consoleErrors.length ? consoleErrors : "Aucune erreur visible.");
 
-        // Capture de l'état avant soumission
+        // ✅ Capture de l'état avant soumission
         await page.screenshot({ path: 'before-submit.png' });
         timeLog("📸 Screenshot enregistré : before-submit.png");
 
-        // Soumettre
+        // ✅ Soumettre le formulaire
         await page.click(submitSelector);
         timeLog("🛠️ Formulaire soumis.");
 
+        // ✅ Attendre la redirection avec un délai plus long pour éviter les timeouts
+        await Promise.race([
+            page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60000 }),
+            new Promise(resolve => setTimeout(resolve, 60000))
+        ]);
 
-        // Attendre redirection ou confirmation
-        await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60000 });
-        timeLog("✅ Connexion réussie (probable).");
+        const currentUrl = page.url();
+        console.log("📌 URL après soumission :", currentUrl);
 
-        // ... continuation éventuelle (cookies, confirmation, etc.)
+        if (currentUrl.includes('/account') || currentUrl.includes('/dashboard')) {
+            timeLog('✅ Connexion réussie !');
+        } else {
+            throw new Error(`⚠️ Login échoué, possible CAPTCHA ou blocage Cloudflare... | Erreur détectée : ${consoleErrors.length ? consoleErrors.join(', ') : "Pas de message"}`);
+        }
 
         await browser.close();
         timeLog("🧹 Navigateur fermé.");
+
     } catch (err) {
-        console.error("❌ Erreur :", err.message);
-        if (browser) await browser.close();
+        console.error("❌ Erreur critique :", err.message);
+        if (browser && browser.isConnected()) await browser.close();
+        throw new Error(`🚨 Échec final dans login: ${err.message}`);
     }
 }
+
 
 
 
