@@ -59,20 +59,14 @@ async function login() {
         console.log('Version Chrome:', version);
 
         page = await browser.newPage();
-
         await page.setUserAgent(
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
             'AppleWebKit/537.36 (KHTML, like Gecko) ' +
             'Chrome/125.0.0.0 Safari/537.36'
         );
 
-        try {
-            await page.goto('https://getallmylinks.com', { waitUntil: 'domcontentloaded', timeout: 120000 });
-            console.log('✅ Test de navigation réussi : getallmylinks.com chargée.');
-        } catch (e) {
-            console.error('❌ Test de navigation échoué:', e.message);
-            throw e;
-        }
+        await page.goto('https://getallmylinks.com', { waitUntil: 'domcontentloaded', timeout: 120000 });
+        console.log('✅ Test de navigation réussi : getallmylinks.com chargée.');
 
         const loginUrl = 'https://getallmylinks.com/login';
         let loginSuccess = false;
@@ -80,44 +74,37 @@ async function login() {
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
                 console.log(`🔁 Tentative de connexion ${attempt}/3`);
-
-                await Promise.all([
-                    page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 120000 }),
-                    page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 120000 })
-                ]);
+                await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 120000 });
 
                 await page.waitForSelector('input[name="email"]', { timeout: 45000, visible: true });
                 await page.waitForSelector('input[name="password"]', { timeout: 45000, visible: true });
 
                 await page.click('input[name="email"]', { clickCount: 3 });
                 await page.keyboard.press('Backspace');
-                await humanDelay(200);
+                await page.type('input[name="email"]', process.env.GAML_EMAIL, { delay: 50 });
 
-                await page.type('input[name="email"]', process.env.GAML_EMAIL, {
-                    delay: 20 + Math.random() * 50
+                await page.type('input[name="password"]', process.env.GAML_PASSWORD, { delay: 50 });
+
+                // 📌 Ajout de logs sur les requêtes envoyées après soumission
+                page.on('request', request => {
+                    console.log(`🛠️ Requête envoyée : ${request.url()} | Méthode : ${request.method()}`);
                 });
 
-                await humanDelay(300 + Math.random() * 300);
-
-                await page.type('input[name="password"]', process.env.GAML_PASSWORD, {
-                    delay: 20 + Math.random() * 50
+                // 📌 Soumission forcée du formulaire via JavaScript
+                await page.evaluate(() => {
+                    document.querySelector('form')?.submit();
                 });
 
-                await humanDelay(500);
-
-                await Promise.all([
-                    page.click('button[type="submit"]'),
-                    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 60000 })
-                ]);
+                await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 60000 });
 
                 const currentUrl = page.url();
                 console.log("📌 URL après soumission :", currentUrl);
 
-                await humanDelay(2000);
-
-                // 📌 Capture du contenu de la page après soumission pour analyser d'éventuels blocages
-                const pageContent = await page.content();
-                console.log("📄 Contenu de la page après soumission :\n", pageContent.slice(0, 1000));
+                // 📌 Vérification des erreurs affichées après soumission
+                const errorMessage = await page.evaluate(() => {
+                    return document.querySelector('.alert.alert-danger')?.innerText || document.querySelector('.error-message')?.innerText;
+                });
+                console.log("❌ Message d'erreur détecté :", errorMessage || "Aucun message trouvé.");
 
                 if (currentUrl.includes('/account')) {
                     loginSuccess = true;
@@ -133,7 +120,7 @@ async function login() {
                 if (browser && browser.isConnected()) {
                     await page.reload({ waitUntil: 'domcontentloaded' }).catch(e => console.log("Erreur lors du rechargement:", e.message));
                 }
-                await humanDelay(3000);
+                await new Promise(resolve => setTimeout(resolve, 3000));
             }
         }
 
