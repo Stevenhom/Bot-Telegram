@@ -47,7 +47,6 @@ async function login() {
     let browser, page;
 
     try {
-        // ✅ Assure que Puppeteer se lance correctement
         browser = await puppeteer.launch(launchOptions);
         if (!browser) {
             throw new Error("🚨 Échec du lancement de Puppeteer, `browser` est undefined !");
@@ -94,9 +93,9 @@ async function login() {
         await page.type(emailSelector, process.env.USER_EMAIL, { delay: 50 });
         await page.type(passwordSelector, process.env.USER_PASSWORD, { delay: 50 });
 
-        // ✅ Capture des erreurs affichées sur la page après soumission
+        // ✅ Capture des erreurs affichées sur la page après soumission (Correction de `text is not iterable`)
         const consoleErrors = await page.evaluate(() => {
-            return [...document.querySelectorAll('.error-message')].map(el => el.innerText);
+            return Array.from(document.querySelectorAll('.error-message')).map(el => el.innerText);
         });
         console.log("🚨 Erreurs détectées :", consoleErrors.length ? consoleErrors : "Aucune erreur visible.");
 
