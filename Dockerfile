@@ -1,7 +1,7 @@
 # Étape 1 : Image de base légère avec Node.js
 FROM node:20-slim
 
-# Étape 2 : Installer les dépendances nécessaires à Puppeteer/Chrome
+# Étape 2 : Installer les dépendances nécessaires à Puppeteer/Chrome et les outils de certificat
 RUN apt-get update && apt-get install -y \
     wget \
     curl \
@@ -24,7 +24,7 @@ RUN apt-get update && apt-get install -y \
     libgbm1 \
     ca-certificates \
     xdg-utils \
-    --no-install-recommends && \
+    nss-tools --no-install-recommends && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Étape 3 : Dossier de travail
@@ -44,11 +44,21 @@ RUN mkdir -p /app/.cache/puppeteer
 RUN npm install --legacy-peer-deps && npm cache clean --force && \
     npx puppeteer browsers install chrome
 
-# Étape 8 : Copier le reste du code
+# Étape 8 : Copier le certificat Bright Data
+COPY "BrightData SSL certificate (port 33335).crt" /usr/local/share/ca-certificates/
+
+# Étape 9 : Mettre à jour les certificats CA du système et importer dans NSS
+ENV HOME /tmp
+RUN update-ca-certificates && \
+    mkdir -p $HOME/.pki/nssdb && \
+    chmod 700 $HOME/.pki/nssdb && \
+    certutil -d $HOME/.pki/nssdb -N --empty-password && \
+    certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "BrightData CA" -i /usr/local/share/ca-certificates/brightdata-ca.crt
+
+# Étape 10 : Copier le reste du code de l'application
 COPY . .
 
-# Étape 9 : Port (si applicable)
-# EXPOSE 3000
+# Étape 11 : Port (si applicable)
 
-# Étape 10 : Commande par défaut
-CMD ["node", "index.js"]
+# Étape 12 : Commande par défaut pour démarrer votre bot
+CMD ["node", "bot.js"] 
