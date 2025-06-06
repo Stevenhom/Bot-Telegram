@@ -129,9 +129,9 @@ async function login() {
                 // Remplissage du formulaire
                 timeLog("⌨️ Saisie des identifiants...");
                 await page.type('input[name="email"]', process.env.GAML_EMAIL, { delay: 50 });
-                await page.waitForTimeout(1000);
+                 await new Promise(resolve => setTimeout(resolve, 10000));
                 await page.type('input[name="password"]', process.env.GAML_PASSWORD, { delay: 50 });
-                await page.waitForTimeout(1000);
+                 await new Promise(resolve => setTimeout(resolve, 10000));
 
                 // Soumission avec gestion spécifique pour Render
                 timeLog("🔄 Soumission du formulaire...");
