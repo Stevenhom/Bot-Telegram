@@ -1,7 +1,7 @@
 # Étape 1 : Image de base avec Node.js (version slim pour équilibre taille/compatibilité)
 FROM node:20-slim
 
-# Étape 2 : Installation des dépendances optimisées
+# Étape 2 : Installation des dépendances système nécessaires
 RUN apt-get update && apt-get install -y \
     libnss3 \
     libx11-xcb1 \
@@ -18,9 +18,9 @@ RUN apt-get update && apt-get install -y \
     fonts-liberation \
     nss-tools \
     xvfb \
-    --no-install-recommends \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    --no-install-recommends && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Étape 3 : Configuration de l'environnement
 WORKDIR /app
@@ -37,15 +37,14 @@ RUN mkdir -p /app/.cache/puppeteer && \
 
 # Étape 5 : Configuration SSL BrightData
 COPY brightdata.crt /usr/local/share/ca-certificates/
-RUN mkdir -p /usr/local/share/ca-certificates && \
+RUN mkdir -p $HOME/.pki/nssdb && \
     update-ca-certificates && \
-    mkdir -p $HOME/.pki/nssdb && \
-    RUN yes | certutil -d sql:$HOME/.pki/nssdb -N --empty-password && \
+    yes | certutil -d sql:$HOME/.pki/nssdb -N --empty-password && \
     certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "brightdata" -i /usr/local/share/ca-certificates/brightdata.crt
 
 # Étape 6 : Copie du code applicatif
 COPY . .
 
-# Étape 7 : Script de démarrage optimisé
+# Étape 7 : Script de démarrage
 RUN chmod +x /app/wait-for-selector.js
-CMD ["xvfb-run", "--server-args=\"-screen 0 1280x720x24\"", "node", "--trace-warnings", "bot.js"]
+CMD ["xvfb-run", "--server-args=-screen 0 1280x720x24", "node", "--trace-warnings", "bot.js"]
