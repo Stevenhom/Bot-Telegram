@@ -30,10 +30,37 @@ async function login() {
 
     timeLog("🔑 Début de la connexion...");
     
-    // Configuration du chemin Chromium
-    let executablePath = IS_RENDER 
-        ? '/usr/bin/chromium-browser'  // Chemin standard sur Render
-        : puppeteer.executablePath();
+      // Nouvelle configuration du chemin Chromium
+    let executablePath;
+    if (IS_RENDER) {
+        // Essayer plusieurs chemins possibles sur Render
+        const possiblePaths = [
+            '/usr/bin/chromium-browser',  // Chemin le plus courant sur Render
+            '/usr/bin/google-chrome',     // Alternative possible
+            '/opt/render/.cache/puppeteer/chrome/linux-*/chrome-linux64/chrome' // Chemin cache puppeteer
+        ];
+        
+        // Vérifier quel chemin existe
+        for (const path of possiblePaths) {
+            try {
+                if (fs.existsSync(path)) {
+                    executablePath = path;
+                    timeLog(`✅ Trouvé Chromium à: ${path}`);
+                    break;
+                }
+            } catch (e) {
+                timeLog(`⚠️ Test chemin ${path}: ${e.message}`);
+            }
+        }
+        
+        if (!executablePath) {
+            // Utiliser le chemin puppeteer par défaut si aucun chemin connu ne fonctionne
+            executablePath = puppeteer.executablePath();
+            timeLog(`⚠️ Utilisation du chemin puppeteer par défaut: ${executablePath}`);
+        }
+    } else {
+        executablePath = puppeteer.executablePath();
+    }
 
     // Configuration de lancement optimisée
     const launchOptions = {
