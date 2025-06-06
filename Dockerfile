@@ -1,66 +1,50 @@
-# Étape 1 : Image de base légère avec Node.js
+# Étape 1 : Image de base avec Node.js (version slim pour équilibre taille/compatibilité)
 FROM node:20-slim
 
-# Étape 2 : Installer les dépendances nécessaires à Puppeteer/Chrome et les outils de certificat
+# Étape 2 : Installation des dépendances optimisées
 RUN apt-get update && apt-get install -y \
-    wget \
-    curl \
-    unzip \
-    fonts-liberation \
-    libappindicator3-1 \
-    libasound2 \
-    libatk-bridge2.0-0 \
-    libatk1.0-0 \
-    libcups2 \
-    libdbus-1-3 \
-    libgdk-pixbuf2.0-0 \
-    libnspr4 \
     libnss3 \
     libx11-xcb1 \
     libxcomposite1 \
     libxdamage1 \
     libxrandr2 \
-    libxss1 \
     libgbm1 \
+    libasound2 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libpangocairo-1.0-0 \
+    libxtst6 \
     ca-certificates \
-    xdg-utils \
+    fonts-liberation \
     nss-tools \
-    --no-install-recommends && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+    xvfb \
+    --no-install-recommends \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# Étape 3 : Définir le dossier de travail
+# Étape 3 : Configuration de l'environnement
 WORKDIR /app
-
-# Étape 4 : Copier les fichiers package.json et package-lock.json
-COPY package*.json ./
-
-# Étape 5 : Variables d'environnement Puppeteer
 ENV PUPPETEER_SKIP_DOWNLOAD=false
-ENV PUPPETEER_CACHE_DIR=/app/.cache/puppeteer
+ENV PUPPETEER_EXECUTABLE_PATH=/app/.cache/puppeteer/chrome/linux-136.0.7103.94/chrome-linux64/chrome
+ENV DISPLAY=:99
+ENV TZ=Europe/Paris
 
-# Étape 6 : Créer le dossier de cache
-RUN mkdir -p /app/.cache/puppeteer
-
-# Étape 7 : Installer les dépendances Node.js et télécharger Chrome pour Puppeteer
-RUN npm install --legacy-peer-deps && npm cache clean --force && \
+# Étape 4 : Installation des dépendances Node
+COPY package*.json ./
+RUN mkdir -p /app/.cache/puppeteer && \
+    npm install --legacy-peer-deps && \
     npx puppeteer browsers install chrome
 
-# Étape 8 : Ajouter le certificat BrightData
+# Étape 5 : Configuration SSL BrightData
 COPY brightdata.crt /usr/local/share/ca-certificates/
-
-# Étape 9 : Mettre à jour les CA et ajouter le certificat dans la base NSS
-ENV HOME=/tmp
 RUN update-ca-certificates && \
     mkdir -p $HOME/.pki/nssdb && \
-    chmod 700 $HOME/.pki/nssdb && \
-    certutil -d $HOME/.pki/nssdb -N --empty-password && \
+    certutil -d sql:$HOME/.pki/nssdb -N --empty-password && \
     certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "BrightData CA" -i /usr/local/share/ca-certificates/brightdata.crt
 
-# Étape 10 : Copier le code source
+# Étape 6 : Copie du code applicatif
 COPY . .
 
-# Étape 11 : Exposer un port (si nécessaire)
-# EXPOSE 10000
-
-# Étape 12 : Commande de démarrage
-CMD ["node", "bot.js"]
+# Étape 7 : Script de démarrage optimisé
+RUN chmod +x /app/wait-for-selector.js
+CMD ["xvfb-run", "--server-args=\"-screen 0 1280x720x24\"", "node", "--trace-warnings", "bot.js"]
