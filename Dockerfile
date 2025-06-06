@@ -21,8 +21,14 @@ RUN apt-get update && apt-get install -y \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Étape 3 : Création du répertoire de l'application
+# Étape 3 : Configuration de l'environnement
 WORKDIR /app
+ENV PUPPETEER_SKIP_DOWNLOAD=false
+ENV PUPPETEER_EXECUTABLE_PATH=/app/.cache/puppeteer/chrome/linux-136.0.7103.94/chrome-linux64/chrome
+ENV DISPLAY=:99
+ENV TZ=Europe/Paris
+ENV RENDER=true
+
 
 # Étape 4 : Copie des fichiers package.json et package-lock.json
 COPY package*.json ./
