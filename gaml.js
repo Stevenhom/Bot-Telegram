@@ -78,33 +78,36 @@ async function login() {
 
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
-                timeLog(`🔁 Tentative ${attempt}/3`);
-                await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
+              timeLog(`🔁 Tentative ${attempt}/3`);
+              await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
 
-                await page.waitForSelector('input[name="email"]', { visible: true, timeout: 30000 });
-                await page.waitForSelector('input[name="password"]', { visible: true, timeout: 30000 });
+              await page.waitForSelector('input[name="email"]', { visible: true, timeout: 30000 });
+              await page.waitForSelector('input[name="password"]', { visible: true, timeout: 30000 });
 
-                await page.type('input[name="email"]', process.env.GAML_EMAIL, { delay: 30 });
-                await page.type('input[name="password"]', process.env.GAML_PASSWORD, { delay: 30 });
+              // New log message here
+              timeLog("📝 Saisie de l'email et du mot de passe...");
+              await page.type('input[name="email"]', process.env.GAML_EMAIL, { delay: 30 });
+              await page.type('input[name="password"]', process.env.GAML_PASSWORD, { delay: 30 });
+              timeLog("✅ Email et mot de passe saisis."); // Confirm after typing
 
-                await Promise.all([
-                    page.click('button[type="submit"]'),
-                    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 45000 })
-                ]);
+              await Promise.all([
+                  page.click('button[type="submit"]'),
+                  page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 45000 })
+              ]);
 
-                if (page.url().includes('/account')) {
-                    loginSuccess = true;
-                    timeLog("✅ Connexion réussie !");
-                    break;
-                }
+              if (page.url().includes('/account')) {
+                  loginSuccess = true;
+                  timeLog("✅ Connexion réussie !");
+                  break;
+              }
 
-                timeLog(`⚠️ Échec de connexion (tentative ${attempt})`);
-                await page.reload();
-                await new Promise(resolve => setTimeout(resolve, 5000));
+              timeLog(`⚠️ Échec de connexion (tentative ${attempt})`);
+              await page.reload();
+              await new Promise(resolve => setTimeout(resolve, 5000));
 
-            } catch (error) {
-                timeLog(`❌ Erreur (tentative ${attempt}): ${error.message}`);
-            }
+          } catch (error) {
+              timeLog(`❌ Erreur (tentative ${attempt}): ${error.message}`);
+          }
         }
 
         if (!loginSuccess) {
