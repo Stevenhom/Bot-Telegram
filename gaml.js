@@ -22,6 +22,7 @@ async function login() {
     };
 
     timeLog("🔑 Début de la connexion...");
+    //config
 
     let executablePath = puppeteer.executablePath();
     if (!executablePath) {
