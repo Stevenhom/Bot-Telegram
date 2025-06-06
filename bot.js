@@ -129,10 +129,6 @@ app.get('/', (req, res) => {
   res.send('Bot is running and alive!');
 });
 
-app.listen(port, () => {
-  console.log(`Web server listening on port ${port}`);
-});
-
 app.get('/health', (req, res) => {
     res.status(200).send('OK');
 });
