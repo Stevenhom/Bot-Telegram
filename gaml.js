@@ -29,60 +29,26 @@ async function login() {
     };
 
     timeLog("🔑 Début de la connexion...");
-    
-      // Nouvelle configuration du chemin Chromium
-    let executablePath;
-    if (IS_RENDER) {
-        // Essayer plusieurs chemins possibles sur Render
-        const possiblePaths = [
-            '/usr/bin/chromium-browser',  // Chemin le plus courant sur Render
-            '/usr/bin/google-chrome',     // Alternative possible
-            '/opt/render/.cache/puppeteer/chrome/linux-*/chrome-linux64/chrome' // Chemin cache puppeteer
-        ];
-        
-        // Vérifier quel chemin existe
-        for (const path of possiblePaths) {
-            try {
-                if (fs.existsSync(path)) {
-                    executablePath = path;
-                    timeLog(`✅ Trouvé Chromium à: ${path}`);
-                    break;
-                }
-            } catch (e) {
-                timeLog(`⚠️ Test chemin ${path}: ${e.message}`);
-            }
-        }
-        
-        if (!executablePath) {
-            // Utiliser le chemin puppeteer par défaut si aucun chemin connu ne fonctionne
-            executablePath = puppeteer.executablePath();
-            timeLog(`⚠️ Utilisation du chemin puppeteer par défaut: ${executablePath}`);
-        }
-    } else {
-        executablePath = puppeteer.executablePath();
-    }
 
-    // Configuration de lancement optimisée
+    // Configuration minimale pour Chromium
     const launchOptions = {
-        executablePath,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
-            '--single-process',
-            '--no-zygote',
             '--disable-gpu',
-            '--disable-extensions',
-            '--window-size=1280,720',
-            '--disable-infobars',
-            '--disable-web-security',
-            '--disable-features=IsolateOrigins,site-per-process',
-            '--disable-site-isolation-trials'
+            '--window-size=1280,720'
         ],
         headless: 'new',
         ignoreHTTPSErrors: true,
-        timeout: 240000 // 4 minutes
+        timeout: 60000
     };
+
+    // Ne pas spécifier de executablePath - laisser Puppeteer gérer ça
+    if (IS_RENDER) {
+        launchOptions.executablePath = puppeteer.executablePath();
+        timeLog(`ℹ️ Chemin Chromium sur Render: ${launchOptions.executablePath}`);
+    }
 
     let browser;
     let page;
@@ -92,83 +58,63 @@ async function login() {
         browser = await puppeteer.launch(launchOptions);
         page = await browser.newPage();
 
-        // Configuration de la page
+        // Configuration basique de la page
         await page.setViewport({ width: 1280, height: 720 });
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-        
-        // Optimisation des requêtes
-        await page.setRequestInterception(true);
-        page.on('request', (req) => {
-            req.resourceType() === 'document' || req.resourceType() === 'script' 
-                ? req.continue() 
-                : req.abort();
-        });
 
-        // Navigation vers la page d'accueil
+        // Désactiver l'interception des requêtes pour plus de stabilité
+        await page.setRequestInterception(false);
+
         timeLog("🌐 Chargement de la page d'accueil...");
         await page.goto('https://getallmylinks.com', {
-            waitUntil: 'networkidle2',
-            timeout: 120000
+            waitUntil: 'domcontentloaded',
+            timeout: 30000
         });
         timeLog("✅ Page d'accueil chargée");
 
-        // Processus de connexion
+        // Processus de connexion simplifié
         const loginUrl = 'https://getallmylinks.com/login';
         let loginSuccess = false;
 
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
-                timeLog(`🔁 Tentative de connexion ${attempt}/3`);
-                
-                // Navigation vers la page de login
-                await page.goto(loginUrl, {
-                    waitUntil: 'networkidle2',
-                    timeout: 120000
-                });
+                timeLog(`🔁 Tentative ${attempt}/3`);
+                await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
 
-                // Remplissage du formulaire
-                timeLog("⌨️ Saisie des identifiants...");
-                await page.type('input[name="email"]', process.env.GAML_EMAIL, { delay: 50 });
-                 await new Promise(resolve => setTimeout(resolve, 10000));
-                await page.type('input[name="password"]', process.env.GAML_PASSWORD, { delay: 50 });
-                 await new Promise(resolve => setTimeout(resolve, 10000));
+                await page.waitForSelector('input[name="email"]', { visible: true, timeout: 30000 });
+                await page.waitForSelector('input[name="password"]', { visible: true, timeout: 30000 });
 
-                // Soumission avec gestion spécifique pour Render
-                timeLog("🔄 Soumission du formulaire...");
-                const navigationPromise = page.waitForNavigation({
-                    waitUntil: 'networkidle0',
-                    timeout: 180000 // 3 minutes
-                });
-                await page.click('button[type="submit"]');
-                await navigationPromise;
+                await page.type('input[name="email"]', process.env.GAML_EMAIL, { delay: 30 });
+                await page.type('input[name="password"]', process.env.GAML_PASSWORD, { delay: 30 });
 
-                // Vérification de la connexion
+                await Promise.all([
+                    page.click('button[type="submit"]'),
+                    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 45000 })
+                ]);
+
                 if (page.url().includes('/account')) {
                     loginSuccess = true;
-                    timeLog("🎉 Connexion réussie !");
+                    timeLog("✅ Connexion réussie !");
                     break;
                 }
 
+                timeLog(`⚠️ Échec de connexion (tentative ${attempt})`);
+                await page.reload();
+                await new Promise(resolve => setTimeout(resolve, 5000));
+
             } catch (error) {
-                timeLog(`⚠️ Erreur (tentative ${attempt}): ${error.message}`);
-                if (attempt < 3) {
-                    await page.waitForTimeout(10000); // Attente plus longue sur Render
-                }
+                timeLog(`❌ Erreur (tentative ${attempt}): ${error.message}`);
             }
         }
 
         if (!loginSuccess) {
-            throw new Error("Échec de connexion après 3 tentatives");
+            throw new Error("Échec après 3 tentatives");
         }
-
-        // Désactivation de l'interception des requêtes
-        await page.setRequestInterception(false);
 
         return { browser, page };
 
     } catch (error) {
         timeLog(`❌ Erreur critique: ${error.message}`);
-        if (page) await page.screenshot({ path: 'error.png' });
         if (browser) await browser.close();
         throw error;
     }
