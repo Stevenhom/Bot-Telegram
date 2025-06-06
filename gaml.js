@@ -76,9 +76,9 @@ async function login() {
         const loginUrl = 'https://getallmylinks.com/login';
         let loginSuccess = false;
 
-        for (let attempt = 1; attempt <= 3; attempt++) {
+        for (let attempt = 1; attempt <= 5; attempt++) {
             try {
-              timeLog(`🔁 Tentative ${attempt}/3`);
+              timeLog(`🔁 Tentative ${attempt}/5`);
               await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
 
               await page.waitForSelector('input[name="email"]', { visible: true, timeout: 30000 });
