@@ -31,6 +31,8 @@ async function login() {
             '--disable-gpu',
             '--window-size=1280,720',
             '--disable-web-security',
+            '--ignore-certificate-errors',
+            '--allow-insecure-localhost',
             ...(process.env.PROXY_HOST && process.env.PROXY_PORT ? [
                 `--proxy-server=http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}`
             ] : [])
