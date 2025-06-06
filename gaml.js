@@ -30,19 +30,39 @@ async function login() {
 
     timeLog("🔑 Début de la connexion...");
     
-    // Configuration du chemin Chromium pour Render
+    // Nouvelle configuration du chemin Chromium
     let executablePath;
     if (IS_RENDER) {
-        executablePath = '/usr/bin/google-chrome-stable'; // Chemin standard sur Render
+        // Essayer plusieurs chemins possibles sur Render
+        const possiblePaths = [
+            '/usr/bin/chromium-browser',  // Chemin le plus courant sur Render
+            '/usr/bin/google-chrome',     // Alternative possible
+            '/opt/render/.cache/puppeteer/chrome/linux-*/chrome-linux64/chrome' // Chemin cache puppeteer
+        ];
+        
+        // Vérifier quel chemin existe
+        for (const path of possiblePaths) {
+            try {
+                if (fs.existsSync(path)) {
+                    executablePath = path;
+                    timeLog(`✅ Trouvé Chromium à: ${path}`);
+                    break;
+                }
+            } catch (e) {
+                timeLog(`⚠️ Test chemin ${path}: ${e.message}`);
+            }
+        }
+        
+        if (!executablePath) {
+            // Utiliser le chemin puppeteer par défaut si aucun chemin connu ne fonctionne
+            executablePath = puppeteer.executablePath();
+            timeLog(`⚠️ Utilisation du chemin puppeteer par défaut: ${executablePath}`);
+        }
     } else {
         executablePath = puppeteer.executablePath();
-        if (!executablePath) {
-            console.warn('⚠️ Chemin Chromium non trouvé via puppeteer.executablePath()');
-            executablePath = '/opt/render/.cache/puppeteer/chrome/linux-136.0.7103.94/chrome-linux64/chrome';
-        }
     }
 
-    // Configuration optimisée pour Render.com
+    // Configuration de lancement
     const launchOptions = {
         executablePath,
         args: [
@@ -53,21 +73,14 @@ async function login() {
             '--no-zygote',
             '--disable-gpu',
             '--disable-extensions',
-            '--disable-accelerated-2d-canvas',
             '--window-size=1280,720',
-            '--disable-infobars',
-            '--disable-background-networking',
-            '--disable-default-apps',
-            '--disable-sync',
-            '--disable-notifications',
-            '--disable-popup-blocking',
-            '--disable-translate',
-            '--disable-features=site-per-process'
+            '--disable-infobars'
         ],
-        headless: 'new', // Nouveau mode headless
+        headless: 'new',
         ignoreHTTPSErrors: true,
-        timeout: 180000 // 3 minutes
+        timeout: 180000
     };
+
 
     let browser;
     let page;
