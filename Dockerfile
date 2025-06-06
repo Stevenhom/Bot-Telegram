@@ -28,6 +28,7 @@ ENV PUPPETEER_SKIP_DOWNLOAD=false
 ENV PUPPETEER_EXECUTABLE_PATH=/app/.cache/puppeteer/chrome/linux-136.0.7103.94/chrome-linux64/chrome
 ENV DISPLAY=:99
 ENV TZ=Europe/Paris
+ENV RENDER=true
 
 # Étape 4 : Installation des dépendances Node
 COPY package*.json ./
