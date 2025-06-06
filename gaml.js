@@ -33,6 +33,7 @@ async function login() {
     // Configuration minimale pour Chromium
     const launchOptions = {
         args: [
+            `--proxy-server=${process.env.PROXY_HOST}:${process.env.PROXY_PORT}`,
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
@@ -41,7 +42,7 @@ async function login() {
         ],
         headless: 'new',
         ignoreHTTPSErrors: true,
-        timeout: 60000
+        timeout: 90000
     };
 
     // Ne pas spécifier de executablePath - laisser Puppeteer gérer ça
@@ -58,6 +59,11 @@ async function login() {
         browser = await puppeteer.launch(launchOptions);
         page = await browser.newPage();
 
+          await page.authenticate({
+            username: process.env.PROXY_USER,
+            password: process.env.PROXY_PASS
+        });
+
         // Configuration basique de la page
         await page.setViewport({ width: 1280, height: 720 });
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
@@ -65,6 +71,29 @@ async function login() {
         // Désactiver l'interception des requêtes pour plus de stabilité
         await page.setRequestInterception(false);
 
+        // Test de connectivité proxy
+        try {
+            timeLog("🔍 Test de connexion du proxy...");
+            await page.goto('https://api.ipify.org?format=json', {
+                waitUntil: 'networkidle0',
+                timeout: 30000
+            });
+            
+            const ip = await page.evaluate(() => {
+                try {
+                    return JSON.parse(document.body.textContent).ip;
+                } catch (e) {
+                    return document.body.textContent;
+                }
+            });
+            
+            timeLog(`ℹ️ IP du proxy: ${ip}`);
+            if (!ip) throw new Error('Aucune IP détectée');
+        } catch (e) {
+            timeLog('❌ Échec de connexion via le proxy');
+            await page.screenshot({ path: 'proxy_error.png' });
+            throw new Error(`Échec du proxy: ${e.message}`);
+        }
         timeLog("🌐 Chargement de la page d'accueil...");
         await page.goto('https://getallmylinks.com', {
             waitUntil: 'domcontentloaded',
