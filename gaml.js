@@ -1,20 +1,32 @@
-// Importations de base
-const puppeteer = require('puppeteer-extra');
+  const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteer.use(StealthPlugin());
 const fs = require('fs');
-
-const pTimeout = require('p-timeout');
-
-  // Fonction d'attente pour les délais humanisés
-  const humanDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-  // Définition de la fonction wait standard (pour compatibilité avec le reste du code)
-  const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms)); 
+const fetch = require('node-fetch');
 
 const IS_RENDER = process.env.RENDER === 'true';
 
+// Fonction timeout personnalisée
+const withTimeout = (promise, ms, errorMessage) => {
+    return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error(errorMessage)), ms))
+    ]);
+};
+
+// Vérification de la connexion réseau
+async function checkNetwork() {
+    try {
+        const response = await fetch('https://getallmylinks.com');
+        console.log(`🛜 Vérification réseau - Statut HTTP: ${response.status}`);
+    } catch (error) {
+        console.error('❌ Erreur de connexion réseau:', error.message);
+    }
+}
+
 async function login() {
+    await checkNetwork(); // Vérifier si Render bloque la connexion
+
     const startTime = Date.now();
     const timeLog = (msg) => {
         const delta = ((Date.now() - startTime) / 1000).toFixed(3);
@@ -22,41 +34,52 @@ async function login() {
     };
 
     timeLog("🔑 Début de la connexion...");
-
+    
     let executablePath = puppeteer.executablePath();
     if (!executablePath) {
-        console.warn('⚠️ Chemin Chromium non trouvé via puppeteer.executablePath(), utilisation d\'un chemin par défaut...');
+        console.warn('⚠️ Chromium non détecté, tentative de chemin par défaut...');
         executablePath = '/opt/render/.cache/puppeteer/chrome/linux-136.0.7103.94/chrome-linux64/chrome';
     }
+    console.log(`🖥️ Chromium utilisé: ${executablePath}`);
 
+    // Configuration optimisée pour Render
     const launchOptions = {
         executablePath,
         args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--disable-infobars',
-            '--window-size=1280,720',
-            '--disable-web-security',
-            '--disable-background-timer-throttling',
-            '--disable-backgrounding-occluded-windows',
-            '--disable-renderer-backgrounding'
+            '--no-sandbox', '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage', '--disable-gpu',
+            '--disable-infobars', '--window-size=1280,720',
+            '--disable-web-security', '--single-process',
+            '--disable-accelerated-2d-canvas', '--no-first-run',
+            '--disable-plugins', '--disable-images', '--disable-sync'
         ],
-        headless: true,
-        ignoreHTTPSErrors: true
+        headless: IS_RENDER ? true : false, // Tester headless=false si problème persistant
+        ignoreHTTPSErrors: true,
+        timeout: 120000
     };
 
     let browser;
     let page;
 
     try {
-        browser = await puppeteer.launch(launchOptions);
+        browser = await withTimeout(puppeteer.launch(launchOptions), 120000, 'Timeout lors du lancement');
         page = await browser.newPage();
-
+        await page.setViewport({ width: 1280, height: 720 });
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/125.0.0.0 Safari/537.36');
 
-        await page.goto('https://getallmylinks.com', { waitUntil: 'domcontentloaded', timeout: 90000 });
+        await page.setRequestInterception(true);
+        page.on('request', (req) => {
+            const blockedTypes = ['image', 'stylesheet', 'font', 'media'];
+            if (blockedTypes.includes(req.resourceType())) req.abort();
+            else req.continue();
+        });
+
+        // Navigation améliorée avec plusieurs méthodes de chargement
+        await withTimeout(
+            page.goto('https://getallmylinks.com', { waitUntil: ['load', 'domcontentloaded', 'networkidle0'], timeout: 150000 }),
+            160000,
+            'Timeout lors du chargement de la page'
+        );
         timeLog("✅ Page d'accueil chargée");
 
         const loginUrl = 'https://getallmylinks.com/login';
@@ -65,18 +88,22 @@ async function login() {
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
                 timeLog(`🔁 Tentative ${attempt}/3`);
-                await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
+                await withTimeout(page.goto(loginUrl, { waitUntil: 'networkidle2', timeout: 120000 }), 130000, `Timeout tentative ${attempt}`);
 
-                await page.waitForSelector('input[name="email"]', { visible: true, timeout: 30000 });
-                await page.waitForSelector('input[name="password"]', { visible: true, timeout: 30000 });
+                await withTimeout(page.waitForSelector('input[name="email"]', { visible: true, timeout: 60000 }), 70000, 'Timeout email');
+                await withTimeout(page.waitForSelector('input[name="password"]', { visible: true, timeout: 60000 }), 70000, 'Timeout password');
 
-                await page.type('input[name="email"]', process.env.GAML_EMAIL, { delay: 30 });
-                await page.type('input[name="password"]', process.env.GAML_PASSWORD, { delay: 30 });
+                await page.type('input[name="email"]', process.env.GAML_EMAIL, { delay: 50 });
+                await page.type('input[name="password"]', process.env.GAML_PASSWORD, { delay: 50 });
 
-                await Promise.all([
-                    page.click('button[type="submit"]'),
-                    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 45000 })
-                ]);
+                await withTimeout(
+                    Promise.all([
+                        page.click('button[type="submit"]'),
+                        page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 90000 })
+                    ]),
+                    100000,
+                    `Timeout soumission tentative ${attempt}`
+                );
 
                 if (page.url().includes('/account')) {
                     loginSuccess = true;
@@ -85,16 +112,16 @@ async function login() {
                 }
 
                 timeLog(`⚠️ Échec de connexion (tentative ${attempt})`);
-                await page.reload();
-                await new Promise(resolve => setTimeout(resolve, 5000));
-
+                await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 });
             } catch (error) {
-                timeLog(`❌ Erreur (tentative ${attempt}): ${error.message}`);
+                timeLog(`❌ Erreur tentative ${attempt}: ${error.message}`);
+                await new Promise(resolve => setTimeout(resolve, IS_RENDER ? 10000 : 5000));
             }
         }
 
-        if (!loginSuccess) throw new Error("Échec après 3 tentatives");
+        if (!loginSuccess) throw new Error("Échec de connexion après 3 tentatives");
 
+        await page.setRequestInterception(false);
         return { browser, page };
 
     } catch (error) {
@@ -103,7 +130,6 @@ async function login() {
         throw error;
     }
 }
-
 
 
 // Encapsulation avec timeout global
