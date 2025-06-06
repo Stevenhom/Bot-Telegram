@@ -30,7 +30,6 @@ async function login() {
 
     timeLog("🔑 Début de la connexion...");
 
-    // Configuration minimale pour Chromium
     const launchOptions = {
         args: [
             `--proxy-server=${process.env.PROXY_HOST}:${process.env.PROXY_PORT}`,
@@ -45,7 +44,6 @@ async function login() {
         timeout: 90000
     };
 
-    // Ne pas spécifier de executablePath - laisser Puppeteer gérer ça
     if (IS_RENDER) {
         launchOptions.executablePath = puppeteer.executablePath();
         timeLog(`ℹ️ Chemin Chromium sur Render: ${launchOptions.executablePath}`);
@@ -59,26 +57,22 @@ async function login() {
         browser = await puppeteer.launch(launchOptions);
         page = await browser.newPage();
 
-          await page.authenticate({
+        await page.authenticate({
             username: process.env.PROXY_USER,
             password: process.env.PROXY_PASS
         });
 
-        // Configuration basique de la page
         await page.setViewport({ width: 1280, height: 720 });
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-
-        // Désactiver l'interception des requêtes pour plus de stabilité
         await page.setRequestInterception(false);
 
-        // Test de connectivité proxy
         try {
             timeLog("🔍 Test de connexion du proxy...");
             await page.goto('https://api.ipify.org?format=json', {
                 waitUntil: 'networkidle0',
                 timeout: 30000
             });
-            
+
             const ip = await page.evaluate(() => {
                 try {
                     return JSON.parse(document.body.textContent).ip;
@@ -86,7 +80,7 @@ async function login() {
                     return document.body.textContent;
                 }
             });
-            
+
             timeLog(`ℹ️ IP du proxy: ${ip}`);
             if (!ip) throw new Error('Aucune IP détectée');
         } catch (e) {
@@ -94,6 +88,7 @@ async function login() {
             await page.screenshot({ path: 'proxy_error.png' });
             throw new Error(`Échec du proxy: ${e.message}`);
         }
+
         timeLog("🌐 Chargement de la page d'accueil...");
         await page.goto('https://getallmylinks.com', {
             waitUntil: 'domcontentloaded',
@@ -101,51 +96,51 @@ async function login() {
         });
         timeLog("✅ Page d'accueil chargée");
 
-        // Processus de connexion simplifié
         const loginUrl = 'https://getallmylinks.com/login';
         let loginSuccess = false;
 
         for (let attempt = 1; attempt <= 5; attempt++) {
             try {
-              timeLog(`🔁 Tentative ${attempt}/5`);
-              await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
+                timeLog(`🔁 Tentative ${attempt}/5`);
+                await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
 
-              await page.waitForSelector('input[name="email"]', { visible: true, timeout: 30000 });
-              await page.waitForSelector('input[name="password"]', { visible: true, timeout: 30000 });
+                await page.waitForSelector('input[name="email"]', { visible: true, timeout: 30000 });
+                await page.waitForSelector('input[name="password"]', { visible: true, timeout: 30000 });
 
-              // New log message here
-              timeLog("📝 Saisie de l'email et du mot de passe...");
-              await page.type('input[name="email"]', process.env.GAML_EMAIL, { delay: 30 });
-              await page.type('input[name="password"]', process.env.GAML_PASSWORD, { delay: 30 });
-              timeLog("✅ Email et mot de passe saisis."); // Confirm after typing
+                timeLog("📝 Saisie de l'email et du mot de passe...");
+                await page.type('input[name="email"]', process.env.GAML_EMAIL, { delay: 30 });
+                await page.type('input[name="password"]', process.env.GAML_PASSWORD, { delay: 30 });
+                timeLog("✅ Email et mot de passe saisis.");
 
-              await page.evaluate(() => {
-                  localStorage.clear();
-                  sessionStorage.clear();
-              });
-              await page.deleteCookie();
-              await Promise.all([
-                  page.click('button[type="submit"]'),
-                  page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 45000 })
-              ]);
+                await page.evaluate(() => {
+                    localStorage.clear();
+                    sessionStorage.clear();
+                });
+                const cookies = await page.cookies();
+                await page.deleteCookie(...cookies);
 
-              if (page.url().includes('/account')) {
-                  loginSuccess = true;
-                  timeLog("✅ Connexion réussie !");
-                  break;
-              }
+                await Promise.all([
+                    page.click('button[type="submit"]'),
+                    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 45000 })
+                ]);
 
-              timeLog(`⚠️ Échec de connexion (tentative ${attempt})`);
-              await page.reload();
-              await new Promise(resolve => setTimeout(resolve, 5000));
+                if (page.url().includes('/account')) {
+                    loginSuccess = true;
+                    timeLog("✅ Connexion réussie !");
+                    break;
+                }
 
-          } catch (error) {
-              timeLog(`❌ Erreur (tentative ${attempt}): ${error.message}`);
-          }
+                timeLog(`⚠️ Échec de connexion (tentative ${attempt})`);
+                await page.reload();
+                await new Promise(resolve => setTimeout(resolve, 5000));
+
+            } catch (error) {
+                timeLog(`❌ Erreur (tentative ${attempt}): ${error.message}`);
+            }
         }
 
         if (!loginSuccess) {
-            throw new Error("Échec après 3 tentatives");
+            throw new Error("Échec après 5 tentatives");
         }
 
         return { browser, page };
