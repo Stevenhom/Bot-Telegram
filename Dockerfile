@@ -37,10 +37,11 @@ RUN mkdir -p /app/.cache/puppeteer && \
 
 # Étape 5 : Configuration SSL BrightData
 COPY brightdata.crt /usr/local/share/ca-certificates/
-RUN update-ca-certificates && \
+RUN mkdir -p /usr/local/share/ca-certificates && \
+    update-ca-certificates && \
     mkdir -p $HOME/.pki/nssdb && \
-    certutil -d sql:$HOME/.pki/nssdb -N --empty-password && \
-    certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "BrightData CA" -i /usr/local/share/ca-certificates/brightdata.crt
+    RUN yes | certutil -d sql:$HOME/.pki/nssdb -N --empty-password && \
+    certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "brightdata" -i /usr/local/share/ca-certificates/brightdata.crt
 
 # Étape 6 : Copie du code applicatif
 COPY . .

@@ -64,6 +64,11 @@ async function login() {
             timeLog("✅ Proxy authentifié");
         }
 
+        page.on('requestfailed', request => {
+            console.log(`❌ Request failed: ${request.url()} - ${request.failure().errorText}`);
+        });
+
+
         // Navigation initiale de test
         await page.goto('https://getallmylinks.com', {
             waitUntil: 'domcontentloaded',
