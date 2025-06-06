@@ -41,6 +41,5 @@ RUN mkdir -p /app/.cache/puppeteer && \
 # Étape 5 : Copie du code applicatif
 COPY . .
 
-# Étape 6 : Exposition du port et démarrage
-EXPOSE 10000
+# Étape 6 : Démarrage (pas d'EXPOSE fixe car Render utilise PORT dynamique)
 CMD ["xvfb-run", "--server-args=-screen 0 1280x720x24", "node", "--trace-warnings", "bot.js"]

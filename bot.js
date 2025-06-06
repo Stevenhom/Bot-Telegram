@@ -143,6 +143,10 @@ bot.launch({
     limit: 100 
   }
 });
+
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Web server listening on port ${port}`);
+});
 console.log('🤖 Bot Sirenza démarré !');
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
