@@ -1,9 +1,9 @@
-# Étape 1 : Image de base avec Node.js (version slim pour équilibre taille/compatibilité)
+# Étape 1 : Image de base légère avec Node.js
 FROM node:20-slim
 
-# Étape 2 : Installation des dépendances système nécessaires
+# Étape 2 : Installation des dépendances système nécessaires à Chromium
 RUN apt-get update && apt-get install -y \
-    libcups2 \                      # <--- Ajouté pour résoudre le problème
+    libcups2 \
     libnss3 \
     libx11-xcb1 \
     libxcomposite1 \
@@ -39,13 +39,13 @@ ENV DISPLAY=:99
 ENV TZ=Europe/Paris
 ENV RENDER=true
 
-# Étape 5 : Copie des fichiers package.json et package-lock.json
+# Étape 5 : Copie des fichiers de dépendances Node.js
 COPY package*.json ./
 
-# Étape 6 : Installation des dépendances Node.js
+# Étape 6 : Installation des dépendances Node.js en production
 RUN npm install --production
 
-# Étape 7 : Copie du reste du code de l'application
+# Étape 7 : Copie du reste du code source de l'application
 COPY . .
 
 # Étape 8 : Définition de la commande de démarrage
