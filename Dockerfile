@@ -1,4 +1,4 @@
-# Étape 1 : Image de base avec Node.js (version slim pour équilibre taille/compatibilité)
+# Étape 1 : Image de base avec Node.js
 FROM node:20-slim
 
 # Étape 2 : Installation des dépendances système nécessaires
@@ -16,8 +16,10 @@ RUN apt-get update && apt-get install -y \
     libxtst6 \
     ca-certificates \
     fonts-liberation \
-    nss-tools \
+    libnss3-tools \
     xvfb \
+    libxss1 \
+    libgconf-2-4 \
     --no-install-recommends && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -25,7 +27,7 @@ RUN apt-get update && apt-get install -y \
 # Étape 3 : Configuration de l'environnement
 WORKDIR /app
 ENV PUPPETEER_SKIP_DOWNLOAD=false
-ENV PUPPETEER_EXECUTABLE_PATH=/app/.cache/puppeteer/chrome/linux-136.0.7103.94/chrome-linux64/chrome
+ENV PUPPETEER_EXECUTABLE_PATH=/app/.cache/puppeteer/chrome/linux-137.0.7151.55/chrome-linux64/chrome
 ENV DISPLAY=:99
 ENV TZ=Europe/Paris
 
@@ -35,16 +37,9 @@ RUN mkdir -p /app/.cache/puppeteer && \
     npm install --legacy-peer-deps && \
     npx puppeteer browsers install chrome
 
-# Étape 5 : Configuration SSL BrightData
-COPY brightdata.crt /usr/local/share/ca-certificates/
-RUN mkdir -p $HOME/.pki/nssdb && \
-    update-ca-certificates && \
-    yes | certutil -d sql:$HOME/.pki/nssdb -N --empty-password && \
-    certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "brightdata" -i /usr/local/share/ca-certificates/brightdata.crt
-
-# Étape 6 : Copie du code applicatif
+# Étape 5 : Copie du code applicatif
 COPY . .
 
-# Étape 7 : Script de démarrage
-RUN chmod +x /app/wait-for-selector.js
+# Étape 6 : Exposition du port et démarrage
+EXPOSE 10000
 CMD ["xvfb-run", "--server-args=-screen 0 1280x720x24", "node", "--trace-warnings", "bot.js"]
