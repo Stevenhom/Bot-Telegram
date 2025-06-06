@@ -4,9 +4,7 @@ const { createLink, getLinkStats, getAllLinksStats, validatePeriod } = require('
 const puppeteer = require('puppeteer');
 const { exec } = require("child_process");
 
-const bot = new Telegraf(process.env.TELEGRAM_TOKEN, {
-  handlerTimeout: 180000, 
-});
+const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 const requiredVars = ['TELEGRAM_TOKEN', 'GAML_EMAIL', 'GAML_PASSWORD'];
 const validPeriods = [
   'today', 'yesterday', '7days', 'current_month', 

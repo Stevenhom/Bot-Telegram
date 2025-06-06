@@ -1,9 +1,8 @@
-# Étape 1 : Image de base légère avec Node.js
+# Étape 1 : Image de base avec Node.js (version slim pour équilibre taille/compatibilité)
 FROM node:20-slim
 
-# Étape 2 : Installation des dépendances système nécessaires à Chromium
+# Étape 2 : Installation des dépendances système nécessaires
 RUN apt-get update && apt-get install -y \
-    libcups2 \
     libnss3 \
     libx11-xcb1 \
     libxcomposite1 \
@@ -17,36 +16,35 @@ RUN apt-get update && apt-get install -y \
     libxtst6 \
     ca-certificates \
     fonts-liberation \
+    nss-tools \
     xvfb \
-    wget \
-    unzip \
     --no-install-recommends && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Étape 3 : Téléchargement manuel de Chromium compatible avec Puppeteer
-RUN mkdir -p /app/.cache/puppeteer/chrome/linux-136.0.7103.94/ && \
-    wget -O /tmp/chromium.zip https://storage.googleapis.com/chrome-for-testing-public/136.0.7103.94/linux64/chrome-linux64.zip && \
-    unzip /tmp/chromium.zip -d /tmp/ && \
-    mv /tmp/chrome-linux64 /app/.cache/puppeteer/chrome/linux-136.0.7103.94/ && \
-    rm -rf /tmp/chromium.zip
-
-# Étape 4 : Configuration de l'environnement
+# Étape 3 : Configuration de l'environnement
 WORKDIR /app
-ENV PUPPETEER_SKIP_DOWNLOAD=true
+ENV PUPPETEER_SKIP_DOWNLOAD=false
 ENV PUPPETEER_EXECUTABLE_PATH=/app/.cache/puppeteer/chrome/linux-136.0.7103.94/chrome-linux64/chrome
 ENV DISPLAY=:99
 ENV TZ=Europe/Paris
-ENV RENDER=true
 
-# Étape 5 : Copie des fichiers de dépendances Node.js
+# Étape 4 : Installation des dépendances Node
 COPY package*.json ./
+RUN mkdir -p /app/.cache/puppeteer && \
+    npm install --legacy-peer-deps && \
+    npx puppeteer browsers install chrome
 
-# Étape 6 : Installation des dépendances Node.js en production
-RUN npm install --production
+# Étape 5 : Configuration SSL BrightData
+COPY brightdata.crt /usr/local/share/ca-certificates/
+RUN mkdir -p $HOME/.pki/nssdb && \
+    update-ca-certificates && \
+    yes | certutil -d sql:$HOME/.pki/nssdb -N --empty-password && \
+    certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "brightdata" -i /usr/local/share/ca-certificates/brightdata.crt
 
-# Étape 7 : Copie du reste du code source de l'application
+# Étape 6 : Copie du code applicatif
 COPY . .
 
-# Étape 8 : Définition de la commande de démarrage
-CMD ["node", "bot.js"]
+# Étape 7 : Script de démarrage
+RUN chmod +x /app/wait-for-selector.js
+CMD ["xvfb-run", "--server-args=-screen 0 1280x720x24", "node", "--trace-warnings", "bot.js"]
