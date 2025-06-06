@@ -3,7 +3,15 @@ const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteer.use(StealthPlugin());
 const fs = require('fs');
 
-const pTimeout = require('p-timeout');
+// Fonction timeout personnalisée
+const withTimeout = (promise, ms, errorMessage) => {
+    return Promise.race([
+        promise,
+        new Promise((_, reject) => 
+            setTimeout(() => reject(new Error(errorMessage)), ms)
+        )
+    ]);
+};
 
 // Fonction d'attente pour les délais humanisés
 const humanDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -66,7 +74,7 @@ async function login() {
 
     try {
         // Wrapping avec timeout personnalisé
-        browser = await pTimeout(
+        browser = await withTimeout(
             puppeteer.launch(launchOptions),
             120000, // 2 minutes pour le lancement
             'Timeout lors du lancement de Puppeteer'
@@ -90,7 +98,7 @@ async function login() {
         });
 
         // Navigation avec timeout augmenté
-        await pTimeout(
+        await withTimeout(
             page.goto('https://getallmylinks.com', { 
                 waitUntil: 'domcontentloaded', 
                 timeout: 120000 // 2 minutes
@@ -108,7 +116,7 @@ async function login() {
                 timeLog(`🔁 Tentative ${attempt}/3`);
                 
                 // Navigation avec timeout
-                await pTimeout(
+                await withTimeout(
                     page.goto(loginUrl, { 
                         waitUntil: 'domcontentloaded', 
                         timeout: 120000 
@@ -118,13 +126,13 @@ async function login() {
                 );
 
                 // Attente des éléments avec timeout augmenté
-                await pTimeout(
+                await withTimeout(
                     page.waitForSelector('input[name="email"]', { visible: true, timeout: 60000 }),
                     70000,
                     'Timeout attente champ email'
                 );
                 
-                await pTimeout(
+                await withTimeout(
                     page.waitForSelector('input[name="password"]', { visible: true, timeout: 60000 }),
                     70000,
                     'Timeout attente champ password'
@@ -137,7 +145,7 @@ async function login() {
                 await humanDelay(1000);
 
                 // Soumission avec timeout augmenté
-                await pTimeout(
+                await withTimeout(
                     Promise.all([
                         page.click('button[type="submit"]'),
                         page.waitForNavigation({ 
