@@ -90,6 +90,11 @@ async function login() {
               await page.type('input[name="password"]', process.env.GAML_PASSWORD, { delay: 30 });
               timeLog("✅ Email et mot de passe saisis."); // Confirm after typing
 
+              await page.evaluate(() => {
+                  localStorage.clear();
+                  sessionStorage.clear();
+              });
+              await page.deleteCookie();
               await Promise.all([
                   page.click('button[type="submit"]'),
                   page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 45000 })
