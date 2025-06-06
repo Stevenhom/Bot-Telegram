@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y \
     fonts-liberation \
     libnss3-tools \
     xvfb \
+    xauth \
     libxss1 \
     libgconf-2-4 \
     --no-install-recommends && \
