@@ -17,27 +17,35 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     fonts-liberation \
     xvfb \
+    wget \
+    unzip \
     --no-install-recommends && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Étape 3 : Configuration de l'environnement
+# Étape 3 : Téléchargement manuel de Chromium compatible avec Puppeteer
+RUN mkdir -p /app/.cache/puppeteer/chrome/linux-136.0.7103.94/ && \
+    wget -O /tmp/chromium.zip https://storage.googleapis.com/chrome-for-testing-public/136.0.7103.94/linux64/chrome-linux64.zip && \
+    unzip /tmp/chromium.zip -d /tmp/ && \
+    mv /tmp/chrome-linux64 /app/.cache/puppeteer/chrome/linux-136.0.7103.94/ && \
+    rm -rf /tmp/chromium.zip
+
+# Étape 4 : Configuration de l'environnement
 WORKDIR /app
-ENV PUPPETEER_SKIP_DOWNLOAD=false
+ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/app/.cache/puppeteer/chrome/linux-136.0.7103.94/chrome-linux64/chrome
 ENV DISPLAY=:99
 ENV TZ=Europe/Paris
 ENV RENDER=true
 
-
-# Étape 4 : Copie des fichiers package.json et package-lock.json
+# Étape 5 : Copie des fichiers package.json et package-lock.json
 COPY package*.json ./
 
-# Étape 5 : Installation des dépendances Node.js
+# Étape 6 : Installation des dépendances Node.js
 RUN npm install --production
 
-# Étape 6 : Copie du reste du code de l'application
+# Étape 7 : Copie du reste du code de l'application
 COPY . .
 
-# Étape 7 : Définition de la commande de démarrage
+# Étape 8 : Définition de la commande de démarrage
 CMD ["node", "bot.js"]
