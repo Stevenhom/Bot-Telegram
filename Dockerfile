@@ -3,6 +3,7 @@ FROM node:20-slim
 
 # Étape 2 : Installation des dépendances système nécessaires
 RUN apt-get update && apt-get install -y \
+    libcups2 \                      # <--- Ajouté pour résoudre le problème
     libnss3 \
     libx11-xcb1 \
     libxcomposite1 \
