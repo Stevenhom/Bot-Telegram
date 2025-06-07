@@ -107,7 +107,12 @@ async function login() {
                   page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 45000 })
               ]);
 
-              if (page.url().includes('/account')) {
+              await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 45000 });
+
+              const currentUrl = page.url();
+              const pageContent = await page.content();
+
+              if (currentUrl.includes('/account') || pageContent.includes('Mon compte') || pageContent.includes('Déconnexion')) {
                   loginSuccess = true;
                   timeLog("✅ Connexion réussie !");
                   break;
