@@ -2,6 +2,7 @@
   const StealthPlugin = require('puppeteer-extra-plugin-stealth');
   puppeteer.use(StealthPlugin());
   const fs = require('fs');
+const RecaptchaPlugin = require('puppeteer-extra-plugin-recaptcha');
 
   // Fonction timeout personnalisée
   const withTimeout = (promise, ms, errorMessage) => {
