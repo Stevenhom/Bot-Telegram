@@ -39,9 +39,10 @@ async function login() {
             '--disable-gpu',
             '--window-size=1280,720'
         ],
-        headless: 'new',
+        headless: true,
         ignoreHTTPSErrors: true,
-        timeout: 60000
+        timeout: 60000,
+        dumpio: true
     };
 
     // Ne pas spécifier de executablePath - laisser Puppeteer gérer ça
