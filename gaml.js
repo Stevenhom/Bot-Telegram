@@ -79,7 +79,7 @@ async function login() {
 
         for (let attempt = 1; attempt <= 5; attempt++) {
             try {
-              timeLog(`🔁 Tentative ${attempt}/3`);
+              timeLog(`🔁 Tentative ${attempt}/5`);
               await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
 
               await page.waitForSelector('input[name="email"]', { visible: true, timeout: 30000 });
@@ -101,15 +101,24 @@ async function login() {
                   page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 45000 })
               ]);
 
+              // Ajout d'un log pour vérifier l'URL après connexion
+              console.log("🔍 URL après connexion :", page.url());
+
               if (page.url().includes('/account')) {
                   loginSuccess = true;
                   timeLog("✅ Connexion réussie !");
+
+                  // Vérifier la présence d'un élément spécifique sur la page pour confirmer l'accès
+                  await page.waitForSelector('div.account-dashboard', { visible: true, timeout: 15000 });
+                  console.log("✅ Tableau de bord détecté, connexion validée !");
                   break;
               }
 
+              // Ajout d'un délai et d'une tentative de reload pour réessayer la connexion
               timeLog(`⚠️ Échec de connexion (tentative ${attempt})`);
               await page.reload();
               await new Promise(resolve => setTimeout(resolve, 5000));
+
 
           } catch (error) {
               timeLog(`❌ Erreur (tentative ${attempt}): ${error.message}`);
@@ -117,7 +126,7 @@ async function login() {
         }
 
         if (!loginSuccess) {
-            throw new Error("Échec après 3 tentatives");
+            throw new Error("Échec après 5 tentatives");
         }
 
         return { browser, page };
