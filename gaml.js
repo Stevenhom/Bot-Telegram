@@ -39,7 +39,7 @@ async function login() {
             '--disable-gpu',
             '--window-size=1280,720'
         ],
-        headless: true,
+        headless: false,
         ignoreHTTPSErrors: true,
         timeout: 60000,
         dumpio: true
@@ -101,24 +101,15 @@ async function login() {
                   page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 45000 })
               ]);
 
-              // Ajout d'un log pour vérifier l'URL après connexion
-              console.log("🔍 URL après connexion :", page.url());
-
               if (page.url().includes('/account')) {
                   loginSuccess = true;
                   timeLog("✅ Connexion réussie !");
-
-                  // Vérifier la présence d'un élément spécifique sur la page pour confirmer l'accès
-                  await page.waitForSelector('div.account-dashboard', { visible: true, timeout: 15000 });
-                  console.log("✅ Tableau de bord détecté, connexion validée !");
                   break;
               }
 
-              // Ajout d'un délai et d'une tentative de reload pour réessayer la connexion
               timeLog(`⚠️ Échec de connexion (tentative ${attempt})`);
               await page.reload();
               await new Promise(resolve => setTimeout(resolve, 5000));
-
 
           } catch (error) {
               timeLog(`❌ Erreur (tentative ${attempt}): ${error.message}`);
