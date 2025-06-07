@@ -13,6 +13,16 @@
       ]);
   };
 
+puppeteer.use(
+    RecaptchaPlugin({
+        provider: {
+            id: '2captcha',
+            token: process.env.CAPTCHA_API_KEY // Clé API 2Captcha
+        },
+        visualFeedback: true // Affiche un cadre autour des captchas traités
+    })
+);
+
   // Fonction d'attente pour les délais humanisés
   const humanDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -30,7 +40,6 @@ async function login() {
 
     timeLog("🔑 Début de la connexion...");
 
-    // Configuration minimale pour Chromium
     const launchOptions = {
         args: [
             '--no-sandbox',
@@ -45,7 +54,6 @@ async function login() {
         dumpio: true
     };
 
-    // Ne pas spécifier de executablePath - laisser Puppeteer gérer ça
     if (IS_RENDER) {
         launchOptions.executablePath = puppeteer.executablePath();
         timeLog(`ℹ️ Chemin Chromium sur Render: ${launchOptions.executablePath}`);
@@ -59,17 +67,12 @@ async function login() {
         browser = await puppeteer.launch(launchOptions);
         page = await browser.newPage();
 
-        // Configuration basique de la page
         await page.setViewport({ width: 1280, height: 720 });
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-
-        await page.setExtraHTTPHeaders({
-          'Accept-Language': 'en-US,en;q=0.9'
-        });
+        await page.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
         await page.evaluateOnNewDocument(() => {
-          Object.defineProperty(navigator, 'webdriver', { get: () => false });
+            Object.defineProperty(navigator, 'webdriver', { get: () => false });
         });
-        // Désactiver l'interception des requêtes pour plus de stabilité
         await page.setRequestInterception(false);
 
         timeLog("🌐 Chargement de la page d'accueil...");
@@ -79,7 +82,6 @@ async function login() {
         });
         timeLog("✅ Page d'accueil chargée");
 
-        // Processus de connexion simplifié
         const loginUrl = 'https://getallmylinks.com/login';
         let loginSuccess = false;
 
@@ -88,12 +90,10 @@ async function login() {
                 timeLog(`🔁 Tentative ${attempt}/5`);
                 await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
 
-                // Gérer les cookies ou Axeptio ou autres immédiatement après le chargement
                 await handleCookiePopup(page);
                 await handleAxeptioFullDismiss(page);
                 await handleGooglePopups(page);
 
-                // Assurer que les champs sont bien visibles
                 await page.waitForSelector('input[name="email"]', { visible: true, timeout: 30000 });
                 await page.waitForSelector('input[name="password"]', { visible: true, timeout: 30000 });
 
@@ -102,12 +102,16 @@ async function login() {
                 await page.type('input[name="password"]', process.env.GAML_PASSWORD, { delay: 30 });
                 timeLog("✅ Email et mot de passe saisis.");
 
-                // Nettoyage avant envoi
                 await page.evaluate(() => {
                     localStorage.clear();
                     sessionStorage.clear();
                 });
                 await page.deleteCookie();
+
+                // ➕ Résolution automatique du CAPTCHA avant soumission
+                timeLog("🤖 Vérification et résolution du captcha...");
+                const { captchas, solutions, solved, error } = await page.solveRecaptchas();
+                timeLog(`🔍 Captchas détectés: ${captchas.length}, Résolus: ${solved.length}`);
 
                 await Promise.all([
                     page.click('button[type="submit"]'),
@@ -127,7 +131,6 @@ async function login() {
             } catch (error) {
                 timeLog(`❌ Erreur (tentative ${attempt}): ${error.message}`);
             }
-
         }
 
         if (!loginSuccess) {
@@ -142,7 +145,6 @@ async function login() {
         throw error;
     }
 }
-
 
 // Encapsulation avec timeout global
 async function safeLoginWithTimeout() {
