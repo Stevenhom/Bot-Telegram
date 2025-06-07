@@ -39,7 +39,7 @@ async function login() {
             '--disable-gpu',
             '--window-size=1280,720'
         ],
-        headless: 'new',
+        headless: true,
         ignoreHTTPSErrors: true,
         timeout: 60000,
         dumpio: true
@@ -74,8 +74,8 @@ async function login() {
 
         timeLog("🌐 Chargement de la page d'accueil...");
         await page.goto('https://getallmylinks.com', {
-            waitUntil: 'networkidle2',
-            timeout: 60000
+            waitUntil: 'domcontentloaded',
+            timeout: 30000
         });
         timeLog("✅ Page d'accueil chargée");
 
@@ -85,46 +85,49 @@ async function login() {
 
         for (let attempt = 1; attempt <= 5; attempt++) {
             try {
-              timeLog(`🔁 Tentative ${attempt}/5`);
-              await page.goto(loginUrl, { waitUntil: 'networkidle2', timeout: 90000 });
+                timeLog(`🔁 Tentative ${attempt}/5`);
+                await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
 
-              await page.waitForSelector('input[name="email"]', { visible: true, timeout: 60000 });
-              await page.waitForSelector('input[name="password"]', { visible: true, timeout: 60000 });
+                // Gérer les cookies ou Axeptio ou autres immédiatement après le chargement
+                await handleCookiePopup(page);
+                await handleAxeptioFullDismiss(page);
+                await handleGooglePopups(page);
 
-              // New log message here
-              timeLog("📝 Saisie de l'email et du mot de passe...");
-              await page.type('input[name="email"]', process.env.GAML_EMAIL, { delay: 30 });
-              await page.type('input[name="password"]', process.env.GAML_PASSWORD, { delay: 30 });
-              timeLog("✅ Email et mot de passe saisis."); // Confirm after typing
+                // Assurer que les champs sont bien visibles
+                await page.waitForSelector('input[name="email"]', { visible: true, timeout: 30000 });
+                await page.waitForSelector('input[name="password"]', { visible: true, timeout: 30000 });
 
-              await page.evaluate(() => {
-                  localStorage.clear();
-                  sessionStorage.clear();
-              });
-              await page.deleteCookie();
-              await Promise.all([
-                  page.click('button[type="submit"]'),
-                  page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 45000 })
-              ]);
+                timeLog("📝 Saisie de l'email et du mot de passe...");
+                await page.type('input[name="email"]', process.env.GAML_EMAIL, { delay: 30 });
+                await page.type('input[name="password"]', process.env.GAML_PASSWORD, { delay: 30 });
+                timeLog("✅ Email et mot de passe saisis.");
 
-              await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 45000 });
+                // Nettoyage avant envoi
+                await page.evaluate(() => {
+                    localStorage.clear();
+                    sessionStorage.clear();
+                });
+                await page.deleteCookie();
 
-              const currentUrl = page.url();
-              const pageContent = await page.content();
+                await Promise.all([
+                    page.click('button[type="submit"]'),
+                    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 45000 })
+                ]);
 
-              if (currentUrl.includes('/account') || pageContent.includes('Mon compte') || pageContent.includes('Déconnexion')) {
-                  loginSuccess = true;
-                  timeLog("✅ Connexion réussie !");
-                  break;
-              }
+                if (page.url().includes('/account')) {
+                    loginSuccess = true;
+                    timeLog("✅ Connexion réussie !");
+                    break;
+                }
 
-              timeLog(`⚠️ Échec de connexion (tentative ${attempt})`);
-              await page.reload();
-              await new Promise(resolve => setTimeout(resolve, 5000));
+                timeLog(`⚠️ Échec de connexion (tentative ${attempt})`);
+                await page.reload();
+                await new Promise(resolve => setTimeout(resolve, 5000));
 
-          } catch (error) {
-              timeLog(`❌ Erreur (tentative ${attempt}): ${error.message}`);
-          }
+            } catch (error) {
+                timeLog(`❌ Erreur (tentative ${attempt}): ${error.message}`);
+            }
+
         }
 
         if (!loginSuccess) {
