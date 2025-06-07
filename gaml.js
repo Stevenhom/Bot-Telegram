@@ -39,7 +39,7 @@ async function login() {
             '--disable-gpu',
             '--window-size=1280,720'
         ],
-        headless: false,
+        headless: true,
         ignoreHTTPSErrors: true,
         timeout: 60000,
         dumpio: true
