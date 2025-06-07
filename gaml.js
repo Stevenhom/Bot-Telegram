@@ -39,7 +39,7 @@ async function login() {
             '--disable-gpu',
             '--window-size=1280,720'
         ],
-        headless: true,
+        headless: 'new',
         ignoreHTTPSErrors: true,
         timeout: 60000,
         dumpio: true
@@ -74,8 +74,8 @@ async function login() {
 
         timeLog("🌐 Chargement de la page d'accueil...");
         await page.goto('https://getallmylinks.com', {
-            waitUntil: 'domcontentloaded',
-            timeout: 30000
+            waitUntil: 'networkidle2',
+            timeout: 60000
         });
         timeLog("✅ Page d'accueil chargée");
 
@@ -86,10 +86,10 @@ async function login() {
         for (let attempt = 1; attempt <= 5; attempt++) {
             try {
               timeLog(`🔁 Tentative ${attempt}/5`);
-              await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
+              await page.goto(loginUrl, { waitUntil: 'networkidle2', timeout: 90000 });
 
-              await page.waitForSelector('input[name="email"]', { visible: true, timeout: 30000 });
-              await page.waitForSelector('input[name="password"]', { visible: true, timeout: 30000 });
+              await page.waitForSelector('input[name="email"]', { visible: true, timeout: 60000 });
+              await page.waitForSelector('input[name="password"]', { visible: true, timeout: 60000 });
 
               // New log message here
               timeLog("📝 Saisie de l'email et du mot de passe...");
