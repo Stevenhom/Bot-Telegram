@@ -126,9 +126,6 @@ const humanDelay = (min = 100, max = 300) => {
     setTimeout(resolve, Math.random() * (max - min) + min);
   });
 };
-  console.log('Email :', process.env.GAML_EMAIL);
-console.log('Mot de passe :', process.env.GAML_PASSWORD);
-
 
     timeLog("🌐 Chargement de la page d'accueil...");
     await page.goto("https://getallmylinks.com", {
@@ -145,6 +142,13 @@ console.log('Mot de passe :', process.env.GAML_PASSWORD);
       steps: Math.floor(Math.random() * 20) + 5,
     });
     await page.mouse.click(Math.random() * 500, Math.random() * 400);
+    await page.goto(loginUrl, { waitUntil: "domcontentloaded", timeout: 90000 });
+
+page.on('response', async (response) => {
+    if (response.status() >= 400) {
+        console.log(`⚠️ Erreur détectée : ${await response.text()}`);
+    }
+});
 
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
