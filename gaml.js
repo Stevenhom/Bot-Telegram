@@ -144,9 +144,10 @@ const humanDelay = (min = 100, max = 300) => {
     await page.mouse.click(Math.random() * 500, Math.random() * 400);
     await page.goto(loginUrl, { waitUntil: "domcontentloaded", timeout: 90000 });
 
-await page.on('response', async (response) => {
-    if (response.status() >= 400) {
-        console.log(`⚠️ Erreur détectée : ${await response.text()}`);
+page.on('response', async (response) => {
+    const status = response.status();
+    if (status >= 400) { // Affiche uniquement les erreurs HTTP
+        console.log(`⚠️ Erreur détectée : ${response.url()} - Code ${status}`);
     }
 });
 
