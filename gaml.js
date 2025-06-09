@@ -41,87 +41,95 @@ async function login() {
 
     timeLog("🔑 Début de la connexion...");
 
+    let executablePath = puppeteer.executablePath();
+    if (!executablePath) {
+        console.warn('⚠️ Chemin Chromium non trouvé via puppeteer.executablePath(), utilisation d\'un chemin par défaut...');
+        executablePath = '/opt/render/.cache/puppeteer/chrome/linux-136.0.7103.94/chrome-linux64/chrome';
+    }
+
     const launchOptions = {
+        executablePath,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
             '--disable-gpu',
-            '--window-size=1280,720'
+            '--disable-infobars',
+            '--window-size=1280,720',
+            '--disable-web-security',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding'
         ],
         headless: true,
-        ignoreHTTPSErrors: true,
-        timeout: 60000,
-        dumpio: true
+        ignoreHTTPSErrors: true
     };
-
-    if (IS_RENDER) {
-        launchOptions.executablePath = puppeteer.executablePath();
-        timeLog(`ℹ️ Chemin Chromium sur Render: ${launchOptions.executablePath}`);
-    }
 
     let browser;
     let page;
 
     try {
-        timeLog("🚀 Lancement de Puppeteer...");
         browser = await puppeteer.launch(launchOptions);
         page = await browser.newPage();
 
-        // Simulation d'un comportement humain
-        await page.setViewport({ width: 1280, height: 720 });
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
+        // 🔍 Masquage de l'empreinte WebGL pour éviter la détection
+        await page.evaluateOnNewDocument(() => {
+            const getParameter = WebGLRenderingContext.prototype.getParameter;
+            WebGLRenderingContext.prototype.getParameter = function (parameter) {
+                if (parameter === 37445) return 'Intel Open Source Technology Center';
+                if (parameter === 37446) return 'Mesa DRI Intel(R) HD Graphics 620';
+                return getParameter(parameter);
+            };
+        });
+
+        // 🖥️ Simulation d'un navigateur réel
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/125.0.0.0 Safari/537.36');
         await page.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
+
+        // ➕ Supprimer WebDriver de navigator pour éviter la détection
         await page.evaluateOnNewDocument(() => {
             Object.defineProperty(navigator, 'webdriver', { get: () => false });
         });
-        await page.setRequestInterception(false);
 
         timeLog("🌐 Chargement de la page d'accueil...");
-        await page.goto('https://getallmylinks.com', {
-            waitUntil: 'domcontentloaded',
-            timeout: 30000
-        });
+        await page.goto('https://getallmylinks.com', { waitUntil: 'domcontentloaded', timeout: 90000 });
         timeLog("✅ Page d'accueil chargée");
 
         const loginUrl = 'https://getallmylinks.com/login';
         let loginSuccess = false;
 
-        for (let attempt = 1; attempt <= 5; attempt++) {
-            try {
-                timeLog(`🔁 Tentative ${attempt}/5`);
-                await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
+        // ➕ Ajout de mouvements de souris aléatoires
+        await page.mouse.move(Math.random() * 800, Math.random() * 600, { steps: Math.floor(Math.random() * 20) + 5 });
+        await page.mouse.click(Math.random() * 500, Math.random() * 400);
 
-                await handleCookiePopup(page);
-                await handleAxeptioFullDismiss(page);
-                await handleGooglePopups(page);
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                timeLog(`🔁 Tentative ${attempt}/3`);
+                await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
 
                 await page.waitForSelector('input[name="email"]', { visible: true, timeout: 30000 });
                 await page.waitForSelector('input[name="password"]', { visible: true, timeout: 30000 });
 
-                // ➕ Pause humaine avant de saisir les identifiants
-                await humanDelay(2000 + Math.random() * 2000);
+                // ➕ Pause humaine avant la saisie
+                await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 2000));
 
                 timeLog("📝 Saisie de l'email et du mot de passe...");
                 await page.type('input[name="email"]', process.env.GAML_EMAIL, { delay: 50 + Math.random() * 50 });
                 await page.type('input[name="password"]', process.env.GAML_PASSWORD, { delay: 50 + Math.random() * 50 });
-                timeLog("✅ Email et mot de passe saisis.");
 
-                // ➕ Simulation de mouvements de souris après la saisie
-                await page.mouse.move(500, 300, { steps: 10 });
-
+                // ➕ Supprimer les cookies et le stockage pour éviter la détection
                 await page.evaluate(() => {
                     localStorage.clear();
                     sessionStorage.clear();
                 });
                 await page.deleteCookie();
-                
-                timeLog("🤖 Vérification et résolution du captcha...");
-                const { captchas, solutions, solved, error } = await page.solveRecaptchas();
-                timeLog(`🔍 Captchas détectés: ${captchas.length}, Résolus: ${solved.length}`);
 
-                // ➕ Pause humaine avant de cliquer sur le bouton
-                await humanDelay(3000 + Math.random() * 2000);
+                // ➕ Pause avant de cliquer sur le bouton (simulation d’utilisateur)
+                await new Promise(resolve => setTimeout(resolve, 3000 + Math.random() * 2000));
+
+                // 🔘 Simulation de survol et attente du bouton avant interaction
+                await page.waitForSelector('button[type="submit"]', { visible: true });
+                await page.hover('button[type="submit"]');
 
                 await Promise.all([
                     page.click('button[type="submit"]'),
@@ -138,16 +146,14 @@ async function login() {
 
                 timeLog(`⚠️ Échec de connexion (tentative ${attempt})`);
                 await page.reload();
-                await humanDelay(5000);
+                await new Promise(resolve => setTimeout(resolve, 5000));
 
             } catch (error) {
                 timeLog(`❌ Erreur (tentative ${attempt}): ${error.message}`);
             }
         }
 
-        if (!loginSuccess) {
-            throw new Error("Échec après 5 tentatives");
-        }
+        if (!loginSuccess) throw new Error("Échec après 3 tentatives");
 
         return { browser, page };
 
@@ -157,6 +163,7 @@ async function login() {
         throw error;
     }
 }
+
 
 
 // Encapsulation avec timeout global
