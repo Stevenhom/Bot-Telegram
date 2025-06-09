@@ -126,23 +126,16 @@ const humanDelay = (min = 100, max = 300) => {
     setTimeout(resolve, Math.random() * (max - min) + min);
   });
 };
-// Test pour confirmer - ajoutez dans votre code Render
-try {
-  console.log('=== TEST IP SERVEUR ===');
-  
-  const response = await page.goto('https://httpbin.org/ip');
-  const content = await page.content();
-  
-  // Extraire l'IP du JSON retourné par httpbin
-  const ipMatch = content.match(/"origin":\s*"([^"]+)"/);
-  const serverIP = ipMatch ? ipMatch[1] : 'IP non trouvée';
-  
-  console.log('IP du serveur Render:', serverIP);
-  console.log('Contenu complet httpbin:', content);
-  
-} catch (error) {
-  console.log('Erreur lors du test IP:', error.message);
-}
+const fetch = require('node-fetch');
+
+(async () => {
+    const response = await fetch('https://getallmylinks.com', {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+    });
+
+    const body = await response.text();
+    console.log("reponse du body:" + body);
+})();
 
     timeLog("🌐 Chargement de la page d'accueil...");
     await page.goto("https://getallmylinks.com", {
