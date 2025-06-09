@@ -134,7 +134,10 @@ const fetch = require('node-fetch');
     });
 
     const body = await response.text();
-    console.log("reponse du body:" + body);
+    console.log("reponse du body:");
+    console.log(body.includes('captcha'));  // Vérifie si un CAPTCHA est présent
+console.log(body.includes('error'));    // Vérifie s’il y a un message d’erreur
+console.log(body.includes('login'));    // Vérifie si on est sur la page de connexion 
 })();
 
     timeLog("🌐 Chargement de la page d'accueil...");
