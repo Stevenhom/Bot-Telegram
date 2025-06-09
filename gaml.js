@@ -61,7 +61,7 @@ async function login() {
             '--disable-backgrounding-occluded-windows',
             '--disable-renderer-backgrounding'
         ],
-        headless: true,
+        headless: false,
         ignoreHTTPSErrors: true
     };
 
