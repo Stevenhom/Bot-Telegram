@@ -144,13 +144,6 @@ const humanDelay = (min = 100, max = 300) => {
     await page.mouse.click(Math.random() * 500, Math.random() * 400);
     await page.goto(loginUrl, { waitUntil: "domcontentloaded", timeout: 90000 });
 
-page.on('response', async (response) => {
-    const status = response.status();
-    if (status >= 400) { // Affiche uniquement les erreurs HTTP
-        console.log(`⚠️ Erreur détectée : ${response.url()} - Code ${status}`);
-    }
-});
-
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         timeLog(`🔁 Tentative ${attempt}/3`);
@@ -221,8 +214,8 @@ page.on('response', async (response) => {
           break;
         }
 
-        timeLog(`⚠️ Échec de connexion (tentative ${attempt})`);
-        await page.reload();
+        // timeLog(`⚠️ Échec de connexion (tentative ${attempt})`);
+        // await page.reload();
         await new Promise((resolve) => setTimeout(resolve, 5000));
       } catch (error) {
         timeLog(`❌ Erreur (tentative ${attempt}): ${error.message}`);
