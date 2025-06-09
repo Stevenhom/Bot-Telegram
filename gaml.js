@@ -126,19 +126,9 @@ const humanDelay = (min = 100, max = 300) => {
     setTimeout(resolve, Math.random() * (max - min) + min);
   });
 };
-const fetch = require('node-fetch');
+  console.log('Email :', process.env.GAML_EMAIL);
+console.log('Mot de passe :', process.env.GAML_PASSWORD);
 
-(async () => {
-    const response = await fetch('https://getallmylinks.com', {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
-    });
-
-    const body = await response.text();
-    console.log("reponse du body:");
-    console.log(body.includes('captcha'));  // Vérifie si un CAPTCHA est présent
-console.log(body.includes('error'));    // Vérifie s’il y a un message d’erreur
-console.log(body.includes('login'));    // Vérifie si on est sur la page de connexion 
-})();
 
     timeLog("🌐 Chargement de la page d'accueil...");
     await page.goto("https://getallmylinks.com", {
