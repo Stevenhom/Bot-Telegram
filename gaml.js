@@ -68,8 +68,9 @@ async function login() {
         browser = await puppeteer.launch(launchOptions);
         page = await browser.newPage();
 
+        // Simulation d'un comportement humain
         await page.setViewport({ width: 1280, height: 720 });
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
         await page.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
         await page.evaluateOnNewDocument(() => {
             Object.defineProperty(navigator, 'webdriver', { get: () => false });
@@ -98,26 +99,36 @@ async function login() {
                 await page.waitForSelector('input[name="email"]', { visible: true, timeout: 30000 });
                 await page.waitForSelector('input[name="password"]', { visible: true, timeout: 30000 });
 
+                // ➕ Pause humaine avant de saisir les identifiants
+                await humanDelay(2000 + Math.random() * 2000);
+
                 timeLog("📝 Saisie de l'email et du mot de passe...");
-                await page.type('input[name="email"]', process.env.GAML_EMAIL, { delay: 30 });
-                await page.type('input[name="password"]', process.env.GAML_PASSWORD, { delay: 30 });
+                await page.type('input[name="email"]', process.env.GAML_EMAIL, { delay: 50 + Math.random() * 50 });
+                await page.type('input[name="password"]', process.env.GAML_PASSWORD, { delay: 50 + Math.random() * 50 });
                 timeLog("✅ Email et mot de passe saisis.");
+
+                // ➕ Simulation de mouvements de souris après la saisie
+                await page.mouse.move(500, 300, { steps: 10 });
 
                 await page.evaluate(() => {
                     localStorage.clear();
                     sessionStorage.clear();
                 });
                 await page.deleteCookie();
-
-                // ➕ Résolution automatique du CAPTCHA avant soumission
+                
                 timeLog("🤖 Vérification et résolution du captcha...");
                 const { captchas, solutions, solved, error } = await page.solveRecaptchas();
                 timeLog(`🔍 Captchas détectés: ${captchas.length}, Résolus: ${solved.length}`);
+
+                // ➕ Pause humaine avant de cliquer sur le bouton
+                await humanDelay(3000 + Math.random() * 2000);
 
                 await Promise.all([
                     page.click('button[type="submit"]'),
                     page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 45000 })
                 ]);
+
+                timeLog(`🔍 URL après connexion : ${page.url()}`);
 
                 if (page.url().includes('/account')) {
                     loginSuccess = true;
@@ -127,7 +138,7 @@ async function login() {
 
                 timeLog(`⚠️ Échec de connexion (tentative ${attempt})`);
                 await page.reload();
-                await new Promise(resolve => setTimeout(resolve, 5000));
+                await humanDelay(5000);
 
             } catch (error) {
                 timeLog(`❌ Erreur (tentative ${attempt}): ${error.message}`);
@@ -146,6 +157,7 @@ async function login() {
         throw error;
     }
 }
+
 
 // Encapsulation avec timeout global
 async function safeLoginWithTimeout() {
