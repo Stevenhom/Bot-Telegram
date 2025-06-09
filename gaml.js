@@ -127,6 +127,12 @@ async function login() {
                 // ➕ Pause avant de cliquer sur le bouton (simulation d’utilisateur)
                 await new Promise(resolve => setTimeout(resolve, 3000 + Math.random() * 2000));
 
+                await page.evaluate(() => {
+                    document.cookie.split(";").forEach((c) => {
+                        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+                    });
+                });
+
                 // 🔘 Simulation de survol et attente du bouton avant interaction
                 await page.waitForSelector('button[type="submit"]', { visible: true });
                 await page.hover('button[type="submit"]');
