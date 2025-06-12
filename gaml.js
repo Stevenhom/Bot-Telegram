@@ -888,203 +888,146 @@ async function fullSubmitProcess(page, slug) {
 
   
 async function getLinkStats(slug, period) {
-    let browser, page;
-  
-    try {
-      const session = await login();
-      browser = session.browser;
-      page = session.page;
-  
-      await page.goto('https://getallmylinks.com/account/link/', {
-        waitUntil: 'domcontentloaded',
-        timeout: 30000,
+  let browser, page;
+
+  try {
+    const session = await login();
+    browser = session.browser;
+    page = session.page;
+
+    await page.goto('https://getallmylinks.com/account/link/', {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000,
+    });
+
+    await handleCookiePopup(page);
+
+    await page.waitForSelector('td.text-end.pe-0', { timeout: 10000 });
+
+    // Trouver la ligne correspondante à ce slug
+    const row = await page.evaluateHandle((slug) => {
+      const rows = [...document.querySelectorAll('table tbody tr')];
+      return rows.find(row => {
+        const urlCell = row.querySelector('span.urlToCopy');
+        return urlCell && urlCell.innerText.includes(slug);
       });
-  
-      await handleCookiePopup(page);
-  
-      await page.waitForSelector('td.text-end.pe-0', { timeout: 10000 });
-  
-      // 🔍 Trouver la ligne correspondante à ce slug
-const row = await page.evaluateHandle((slug) => {
-  const rows = [...document.querySelectorAll('table tbody tr')];
-  return rows.find(row => {
-    const urlCell = row.querySelector('span.urlToCopy');
-    return urlCell && urlCell.innerText.includes(slug);
-  });
-}, slug);
+    }, slug);
 
-if (!row) {
-  throw new Error(`❌ Impossible de trouver la ligne contenant "${slug}"`);
-}
+    if (!row) {
+      throw new Error(`❌ Impossible de trouver la ligne contenant "${slug}"`);
+    }
 
-// 🔍 Récupérer le Shield directement depuis la ligne trouvée
-const shieldBadge = await row.$('td span.badge.bg-label-danger, td span.badge.bg-label-success');
-const shieldStatus = shieldBadge ? await shieldBadge.evaluate(el => el.innerText.trim()) : 'Unknown';
+    // Récupérer le Shield
+    const shieldBadge = await row.$('td span.badge.bg-label-danger, td span.badge.bg-label-success');
+    const shieldStatus = shieldBadge ? await shieldBadge.evaluate(el => el.innerText.trim()) : 'Unknown';
 
-console.log(`🛡️ Statut du lien "${slug}" : ${shieldStatus}`);
+    console.log(`🛡️ Statut du lien "${slug}" : ${shieldStatus}`);
 
-// 🔵 Si Shield "No", récupération alternative
-if (shieldStatus === 'No') {
-  console.log(`⚠️ Le lien "${slug}" a un Shield "No", récupération alternative des stats...`);
+    // Trouver le bouton Analytics
+    const analyticsButton = await row.$('a[href*="/analytics"]');
+    if (!analyticsButton) {
+      throw new Error(`❌ Bouton Analytics introuvable pour "${slug}"`);
+    }
 
-  const analyticsButton = await row.$('a[href*="/analytics"]');
-  if (!analyticsButton) {
-    throw new Error(`❌ Bouton Analytics introuvable pour "${slug}"`);
-  }
-
-  await analyticsButton.click();
-  await page.waitForSelector('h5.card-title', { timeout: 25000 });
-
-  const visitorsText = await page.$eval('h5.card-title', el => el.innerText.trim());
-  const match = visitorsText.match(/(\d+)/);
-  const visitorsCount = match ? parseInt(match[1]) : 0;
-
-  console.log(`✅ Nombre de visiteurs extrait pour "${slug}" : ${visitorsCount}`);
-  return { slug, visitors: visitorsCount, period };
-}
-
-// 🔍 Chercher le lien de prévisualisation (pour les "Yes")
-const previewSelector = `td.text-end.pe-0 a[href*="/preview/${slug}"]`;
-const previewLink = await row.$(previewSelector);
-
-if (!previewLink) {
-  throw new Error(`❌ Lien preview introuvable pour "${slug}"`);
-}
-
-// 🔍 Trouver le bouton Analytics associé
-const analyticsButton = await row.$('a[href*="/analytics"]');
-if (!analyticsButton) {
-  throw new Error(`❌ Bouton Analytics introuvable pour "${slug}"`);
-}
-
-await analyticsButton.click();
+    // Fonction interne pour récupérer les stats à partir de la page Analytics
+    async function extractStatsFromAnalyticsPage(page, period) {
+      await analyticsButton.click();
       await page.waitForSelector('h5.card-title', { timeout: 25000 });
-  
-      // Gestion de la période améliorée
+
       if (period && period !== '30days') {
         const periodMap = {
           today: 'today',
           yesterday: 'yesterday',
-          week: '7days',        // Correction: mapper "week" vers "7days"
+          week: '7days',
           '7days': '7days',
-          month: 'current_month', // Correction: mapper "month" vers "current_month"
+          month: 'current_month',
           current_month: 'current_month',
           last_month: 'last_month',
           current_year: 'current_year',
           last_year: 'last_year',
           all_time: 'all_time',
         };
-  
-        const mapped = periodMap[period];
-        if (!mapped) {
-          throw new Error(`Période invalide: ${period}. Périodes disponibles: ${Object.keys(periodMap).join(', ')}`);
-        }
-  
+
+        const mapped = periodMap[period] || period || '30days';
+
         console.log(`🔄 Changement de période vers: ${period} (mappé: ${mapped})`);
-        
-        // Méthode améliorée pour cliquer sur le dropdown
+
         try {
-          // Chercher le bouton dropdown avec plusieurs sélecteurs possibles
+          // Dropdown click
           const dropdownSelectors = [
             'button.dropdown-toggle',
             'button[data-bs-toggle="dropdown"]',
             '.dropdown-toggle'
           ];
-          
+
           let dropdownButton = null;
           for (const selector of dropdownSelectors) {
             dropdownButton = await page.$(selector);
-            if (dropdownButton) {
-              console.log(`✅ Bouton dropdown trouvé avec: ${selector}`);
-              break;
-            }
+            if (dropdownButton) break;
           }
-          
-          if (!dropdownButton) {
-            throw new Error('Bouton dropdown non trouvé');
-          }
-          
-          // Cliquer sur le dropdown et attendre qu'il s'ouvre
+
+          if (!dropdownButton) throw new Error('Bouton dropdown non trouvé');
+
           await dropdownButton.click();
-          
-          // Attendre que le dropdown soit visible
-          await page.waitForSelector('#date-range-dropdown', { 
-            visible: true, 
-            timeout: 5000 
-          });
-          
-          // Attendre un peu pour s'assurer que le dropdown est complètement ouvert
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-          // Construire le sélecteur exact basé sur le HTML que vous avez fourni
+          await page.waitForSelector('#date-range-dropdown', { visible: true, timeout: 5000 });
+          await new Promise(r => setTimeout(r, 500));
+
           const linkSelector = `#date-range-dropdown a[href*="/${mapped}"]`;
-          
-          console.log(`🔍 Recherche du lien avec sélecteur: ${linkSelector}`);
-          
-          // Vérifier que le lien existe avant de cliquer
-          await page.waitForSelector(linkSelector, { 
-            visible: true, 
-            timeout: 5000 
-          });
-          
-          // Cliquer sur l'option de période
+          await page.waitForSelector(linkSelector, { visible: true, timeout: 5000 });
           await page.click(linkSelector);
-          
+
           console.log(`✅ Période "${mapped}" sélectionnée`);
-  
-          // Attendre la mise à jour des stats avec une vérification plus robuste
+
           await page.waitForFunction(() => {
             const el = document.querySelector('h5.card-title');
             return el && el.innerText.trim().length > 0;
           }, { timeout: 20000 });
-          
-          // Attendre un délai supplémentaire pour s'assurer que les données sont chargées
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-        } catch (dropdownError) {
-          console.error('❌ Erreur lors du changement de période:', dropdownError.message);
-          
-          // Essayer une approche alternative - navigation directe
+          await new Promise(r => setTimeout(r, 500));
+
+        } catch (e) {
+          console.error('❌ Erreur lors du changement de période:', e.message);
+          // Tentative navigation directe
           const currentUrl = page.url();
           const linkId = currentUrl.match(/\/link\/([^\/]+)/)?.[1];
-          
           if (linkId) {
             const directUrl = `https://getallmylinks.com/account/link/${linkId}/analytics/view/${mapped}`;
             console.log(`🔄 Tentative de navigation directe vers: ${directUrl}`);
-            
+
             await page.goto(directUrl, {
               waitUntil: 'domcontentloaded',
               timeout: 30000
             });
-            
+
             await page.waitForSelector('h5.card-title', { timeout: 25000 });
           } else {
-            throw dropdownError;
+            throw e;
           }
         }
       }
-  
-      // Extraire le nombre de visiteurs avec une méthode plus robuste
+
       await page.waitForSelector('h5.card-title', { visible: true, timeout: 10000 });
-      
       const visitorsText = await page.$eval('h5.card-title', el => el.innerText.trim());
       console.log('📊 Texte brut récupéré:', visitorsText);
-  
-      // Regex plus flexible pour extraire le nombre
+
       const match = visitorsText.match(/(\d+)/);
       const visitorsCount = match ? parseInt(match[1]) : 0;
-      
+
       console.log(`📈 Nombre de visiteurs extrait: ${visitorsCount}`);
-  
-      return { slug, visitors: visitorsCount, period: period || '30days' };
-  
-    } catch (err) {
-      console.error('❌ Erreur complète dans getLinkStats:', err);
-      
-      throw new Error(`Erreur stats : ${err.message}`);
-    } finally {
-      if (browser) await browser.close();
+
+      return visitorsCount;
     }
+
+    // Appel de la fonction commune, peu importe le Shield
+    const visitorsCount = await extractStatsFromAnalyticsPage(page, period);
+
+    return { slug, visitors: visitorsCount, period: period || '30days' };
+
+  } catch (err) {
+    console.error('❌ Erreur complète dans getLinkStats:', err);
+    throw new Error(`Erreur stats : ${err.message}`);
+  } finally {
+    if (browser) await browser.close();
+  }
 }
 
 async function getLinkStats2(page, slug, period) {
