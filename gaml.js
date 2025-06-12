@@ -904,22 +904,60 @@ async function getLinkStats(slug, period) {
   
       await page.waitForSelector('td.text-end.pe-0', { timeout: 10000 });
   
-      // Chercher le lien de prévisualisation
-      const previewSelector = `td.text-end.pe-0 a[href*="/preview/${slug}"]`;
-      const previewLink = await page.$(previewSelector);
-      if (!previewLink) {
-        throw new Error(`Lien preview introuvable pour le slug "${slug}"`);
-      }
-  
-      // Chercher le bouton Analytics associé
-      const parentTd = await previewLink.evaluateHandle(el => el.parentElement);
-      const analyticsButton = await parentTd.$('a[href*="/analytics"]');
-      if (!analyticsButton) {
-        throw new Error(`Bouton Analytics introuvable pour le lien "${slug}"`);
-      }
-  
-      await analyticsButton.click();
-  
+      // 🔍 Trouver la ligne correspondante à ce slug
+const row = await page.evaluateHandle((slug) => {
+  const rows = [...document.querySelectorAll('table tbody tr')];
+  return rows.find(row => {
+    const urlCell = row.querySelector('span.urlToCopy');
+    return urlCell && urlCell.innerText.includes(slug);
+  });
+}, slug);
+
+if (!row) {
+  throw new Error(`❌ Impossible de trouver la ligne contenant "${slug}"`);
+}
+
+// 🔍 Récupérer le Shield directement depuis la ligne trouvée
+const shieldBadge = await row.$('td span.badge.bg-label-danger, td span.badge.bg-label-success');
+const shieldStatus = shieldBadge ? await shieldBadge.evaluate(el => el.innerText.trim()) : 'Unknown';
+
+console.log(`🛡️ Statut du lien "${slug}" : ${shieldStatus}`);
+
+// 🔵 Si Shield "No", récupération alternative
+if (shieldStatus === 'No') {
+  console.log(`⚠️ Le lien "${slug}" a un Shield "No", récupération alternative des stats...`);
+
+  const analyticsButton = await row.$('a[href*="/analytics"]');
+  if (!analyticsButton) {
+    throw new Error(`❌ Bouton Analytics introuvable pour "${slug}"`);
+  }
+
+  await analyticsButton.click();
+  await page.waitForSelector('h5.card-title', { timeout: 25000 });
+
+  const visitorsText = await page.$eval('h5.card-title', el => el.innerText.trim());
+  const match = visitorsText.match(/(\d+)/);
+  const visitorsCount = match ? parseInt(match[1]) : 0;
+
+  console.log(`✅ Nombre de visiteurs extrait pour "${slug}" : ${visitorsCount}`);
+  return { slug, visitors: visitorsCount, period };
+}
+
+// 🔍 Chercher le lien de prévisualisation (pour les "Yes")
+const previewSelector = `td.text-end.pe-0 a[href*="/preview/${slug}"]`;
+const previewLink = await row.$(previewSelector);
+
+if (!previewLink) {
+  throw new Error(`❌ Lien preview introuvable pour "${slug}"`);
+}
+
+// 🔍 Trouver le bouton Analytics associé
+const analyticsButton = await row.$('a[href*="/analytics"]');
+if (!analyticsButton) {
+  throw new Error(`❌ Bouton Analytics introuvable pour "${slug}"`);
+}
+
+await analyticsButton.click();
       await page.waitForSelector('h5.card-title', { timeout: 25000 });
   
       // Gestion de la période améliorée
@@ -1057,31 +1095,45 @@ async function getLinkStats2(page, slug, period) {
         await page.goto('https://getallmylinks.com/account/link/', { waitUntil: 'domcontentloaded', timeout: 30000 });
         await page.waitForSelector('td.text-end.pe-0', { timeout: 10000 });
 
-        // 🔍 Trouver l'élément contenant le slug
-        const previewSelector = `td.text-end.pe-0 a[href*="/preview/${slug}"]`;
-        const previewLink = await page.$(previewSelector);
-        if (!previewLink) {
-            throw new Error(`Lien preview introuvable pour le slug "${slug}"`);
-        }
+        // 🔍 Trouver l'élément contenant le slug (pour les "Yes")
+const previewSelector = `td.text-end.pe-0 a[href*="/preview/${slug}"]`;
+const previewLink = await page.$(previewSelector);
 
-        // 🔍 Trouver `linkId` en remontant vers le parent qui contient l'ID
-        const parentRow = await previewLink.evaluateHandle(el => el.closest('tr'));
-        const linkIdElement = await parentRow.$('a[href*="/analytics"]');
+let parentRow;
+if (previewLink) {
+  parentRow = await previewLink.evaluateHandle(el => el.closest('tr'));
+} else {
+  console.log(`⚠️ Pas de preview pour "${slug}", récupération alternative.`);
 
-        if (!linkIdElement) {
-            throw new Error(`Impossible de trouver l'ID du lien pour "${slug}"`);
-        }
+  // 🔵 Chercher la ligne contenant `urlToCopy` sans utiliser contains()
+  parentRow = await page.evaluateHandle((slug) => {
+    const rows = document.querySelectorAll('table tbody tr');
+    return Array.from(rows).find(row => {
+      const urlCell = row.querySelector('span.urlToCopy');
+      return urlCell && urlCell.innerText.includes(slug);
+    });
+  }, slug);
+}
 
-        // 🔵 Extraire `linkId`
-        const linkHref = await linkIdElement.evaluate(el => el.getAttribute('href'));
-        const linkIdMatch = linkHref.match(/\/link\/([^\/]+)/);
-        const linkId = linkIdMatch ? linkIdMatch[1] : null;
+if (!parentRow) {
+  throw new Error(`Impossible de localiser la ligne contenant "${slug}"`);
+}
+// 🔍 Trouver le lien Analytics
+const linkIdElement = await parentRow.$('a[href*="/analytics"]');
+if (!linkIdElement) {
+  throw new Error(`Impossible de trouver l'ID du lien pour "${slug}"`);
+}
 
-        if (!linkId) {
-            throw new Error(`Impossible d'extraire l'ID du lien pour "${slug}"`);
-        }
+// 🔵 Extraire `linkId`
+const linkHref = await linkIdElement.evaluate(el => el.getAttribute('href'));
+const linkIdMatch = linkHref.match(/\/link\/([^\/]+)/);
+const linkId = linkIdMatch ? linkIdMatch[1] : null;
 
-        console.log(`🔗 ID trouvé pour "${slug}" → ${linkId}`);
+if (!linkId) {
+  throw new Error(`Impossible d'extraire l'ID du lien pour "${slug}"`);
+}
+
+console.log(`🔗 ID trouvé pour "${slug}" → ${linkId}`);
 
         // 🔵 Accéder à la vraie page analytics
         const analyticsUrl = `https://getallmylinks.com/account/link/${linkId}/analytics/view/${period}`;
@@ -1139,16 +1191,22 @@ async function getAllLinkSlugs(page) {
       await handleCookiePopup(page);
       await page.waitForSelector('td.text-end.pe-0', { timeout: 10000 });
   
-      // Utiliser la même logique que dans getLinkStats pour trouver tous les liens
-      const slugs = await page.evaluate(() => {
-        const previewLinks = Array.from(document.querySelectorAll('td.text-end.pe-0 a[href*="/preview/"]'));
-        
-        return previewLinks.map(link => {
-          const href = link.getAttribute('href');
-          const slugMatch = href.match(/\/preview\/([^\/]+)/);
-          return slugMatch ? slugMatch[1] : null;
-        }).filter(slug => slug !== null);
-      });
+    const slugs = await page.evaluate(() => {
+  const rows = Array.from(document.querySelectorAll('table tbody tr'));
+
+  return rows.map(row => {
+    const linkCell = row.querySelector('span.urlToCopy');
+    const fullLink = linkCell ? linkCell.innerText.trim() : null;
+
+    const slug = fullLink ? fullLink.split('/').pop() : null;
+
+    // Capturer le statut du Shield
+    const shieldBadge = row.querySelector('td span.badge.bg-label-danger, td span.badge.bg-label-success');
+    const shieldStatus = shieldBadge ? shieldBadge.innerText.trim() : 'Unknown';
+
+    return { slug, shieldStatus };
+  }).filter(link => link.slug !== null);
+});
   
       console.log(`✅ ${slugs.length} liens trouvés:`, slugs);
       return slugs;
@@ -1192,7 +1250,7 @@ async function getAllLinkSlugs(page) {
         const errors = [];
 
         // 🔵 4️⃣ Boucle d'analyse de chaque slug sans déconnexion
-        for (let slug of slugs) {
+        for (let { slug } of slugs) {
             try {
                 console.log(`📈 Analyse du lien "${slug}"...`);
 
